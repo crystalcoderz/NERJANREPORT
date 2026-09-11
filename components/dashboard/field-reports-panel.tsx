@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import useSWR from "swr"
-import { AlertTriangle, Loader2, MapPin, Plus, Radio, User } from "lucide-react"
+import { AlertTriangle, Loader2, MapPin, Plus, Radio, Sparkles, User } from "lucide-react"
 import { Panel, PanelHeader } from "@/components/dashboard/panel"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import type { FieldReport } from "@/app/api/field-reports/route"
+import type { LiveIncident } from "@/app/api/incidents/route"
 
 const REPORT_TYPE_LABELS: Record<FieldReport["report_type"], string> = {
   road_block: "Road Block",
@@ -54,12 +55,26 @@ export function FieldReportsPanel() {
   const { data, isLoading, mutate } = useSWR<{ reports: FieldReport[] }>("/api/field-reports", fetcher, {
     refreshInterval: 15000,
   })
+  const { data: incidentData } = useSWR<{ source: string; incidents: LiveIncident[] }>(
+    "/api/incidents",
+    fetcher,
+    { refreshInterval: 20000 },
+  )
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const reports = data?.reports ?? []
   const activeCount = reports.filter((r) => r.status === "active").length
+
+  const liveIncidents = incidentData?.incidents ?? []
+  const aiIncidents = liveIncidents.filter((i) => i.source === "ai")
+  const latestSync = aiIncidents[0]
+
+  function isReflectedInAiMonitor(report: FieldReport) {
+    if (!report.corridor) return false
+    return aiIncidents.some((inc) => inc.corridor.toLowerCase() === report.corridor?.toLowerCase())
+  }
 
   async function handleSubmit(formData: FormData) {
     setSubmitting(true)
@@ -184,8 +199,19 @@ export function FieldReportsPanel() {
         }
       />
 
+      <div className="flex items-center gap-1.5 border-b border-border px-4 pb-3 text-[11px] text-muted-foreground">
+        <Sparkles className="size-3 shrink-0 text-primary" />
+        {latestSync ? (
+          <span>
+            AI monitor synced {timeAgo(latestSync.created_at)} via {latestSync.model ?? "AI"}
+          </span>
+        ) : (
+          <span>AI monitor warming up...</span>
+        )}
+      </div>
+
       <ScrollArea className="h-[280px] px-4">
-        <div className="flex flex-col gap-3 pb-4">
+        <div className="flex flex-col gap-3 pb-4 pt-3">
           {isLoading && (
             <p className="flex items-center gap-2 py-6 text-center text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" />
@@ -200,6 +226,7 @@ export function FieldReportsPanel() {
           )}
           {reports.map((report) => {
             const severity = SEVERITY_STYLES[report.severity]
+            const reflected = isReflectedInAiMonitor(report)
             return (
               <div
                 key={report.id}
@@ -212,14 +239,22 @@ export function FieldReportsPanel() {
                       {REPORT_TYPE_LABELS[report.report_type]}
                     </span>
                   </div>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                      severity.className,
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {reflected && (
+                      <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        <Sparkles className="size-2.5" />
+                        In AI monitor
+                      </span>
                     )}
-                  >
-                    {severity.label}
-                  </span>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                        severity.className,
+                      )}
+                    >
+                      {severity.label}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-xs leading-relaxed text-card-foreground">{report.description}</p>
                 <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
