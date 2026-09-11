@@ -35,6 +35,8 @@ type Weather = {
   precipPercent: number
   windKph: number
   visibilityKm: number
+  humidity?: number
+  updatedAt?: string | null
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -45,7 +47,7 @@ export function WeatherPanel() {
   const { data } = useSWR<Weather>(
     `/api/weather?lat=${city.lat}&lng=${city.lng}&place=${encodeURIComponent(origin)}`,
     fetcher,
-    { refreshInterval: 300000 },
+    { refreshInterval: 60000 },
   )
 
   const w: Weather = data ?? {
@@ -76,7 +78,7 @@ export function WeatherPanel() {
             {origin}
           </p>
           <p className="text-xs text-muted-foreground">
-            {w.source === "google" ? "Live · Google Weather" : "Sample data"}
+            {w.source === "weatherapi" ? "Live · WeatherAPI" : "Sample data"}
           </p>
         </div>
         <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">

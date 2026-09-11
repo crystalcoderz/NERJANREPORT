@@ -1,6 +1,9 @@
+"use client"
+
+import useSWR from "swr"
 import { CloudRain, Mountain, CloudFog, Waves, Wind } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { weatherAlerts } from "@/lib/data"
+import { weatherAlerts as mockWeatherAlerts } from "@/lib/data"
 import { Panel, PanelHeader } from "./panel"
 
 const kindIcons = {
@@ -17,20 +20,39 @@ const levelStyles = {
   low: "bg-risk-low-bg text-risk-low",
 }
 
+type LiveAlert = {
+  id: string
+  level: keyof typeof levelStyles
+  title: string
+  place: string
+  eta: string
+  kind: keyof typeof kindIcons
+}
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
 export function WeatherAlerts() {
+  const { data } = useSWR<{ source: string; alerts: LiveAlert[] }>("/api/weather-alerts", fetcher, {
+    refreshInterval: 60000,
+  })
+
+  const alerts = data?.alerts ?? mockWeatherAlerts
+  const isLive = data?.source === "weatherapi"
+
   return (
     <Panel>
       <PanelHeader
         title="Weather Alerts"
-        count={weatherAlerts.length}
+        count={alerts.length}
         action={
-          <button type="button" className="text-xs font-medium text-info hover:underline">
-            View All
-          </button>
+          <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+            <span className={cn("size-1.5 rounded-full", isLive ? "bg-risk-low" : "bg-muted-foreground")} />
+            {isLive ? "Live · WeatherAPI" : "Sample data"}
+          </span>
         }
       />
       <ul className="flex flex-col">
-        {weatherAlerts.slice(0, 5).map((a) => {
+        {alerts.slice(0, 5).map((a) => {
           const Icon = kindIcons[a.kind]
           return (
             <li key={a.id} className="flex items-center gap-3 border-t border-border px-4 py-3">
