@@ -7,6 +7,7 @@ import { OtherRoutes } from "@/components/dashboard/other-routes"
 import { UpcomingShipments } from "@/components/dashboard/upcoming-shipments"
 import { WeatherAlerts } from "@/components/dashboard/weather-alerts"
 import { NewsUpdates } from "@/components/dashboard/news-updates"
+import { RouteProvider } from "@/components/dashboard/route-context"
 
 export default function Page() {
   const now = new Date()
@@ -35,17 +36,19 @@ export default function Page() {
 
         <TopBar />
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="flex flex-col gap-5 lg:col-span-2">
-            <StatCards />
-            <RouteMap />
+        <RouteProvider>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <div className="flex flex-col gap-5 lg:col-span-2">
+              <StatCards />
+              <RouteMap />
+            </div>
+            <div className="flex flex-col gap-5">
+              <WeatherPanel />
+              <RecommendedRoute />
+              <OtherRoutes />
+            </div>
           </div>
-          <div className="flex flex-col gap-5">
-            <WeatherPanel />
-            <RecommendedRoute />
-            <OtherRoutes />
-          </div>
-        </div>
+        </RouteProvider>
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
           <UpcomingShipments />
