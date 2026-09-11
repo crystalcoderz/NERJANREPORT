@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { APIProvider, Map, useMap, useMapsLibrary } from "@vis.gl/react-google-maps"
-import { MapPin, Navigation, ArrowLeftRight, KeyRound, Loader2 } from "lucide-react"
+import { MapPin, Navigation, ArrowLeftRight, KeyRound, Loader2, Waypoints, X } from "lucide-react"
 import { cities, incidents, type LatLng } from "@/lib/data"
 import { deriveRisk, estimateRoute, formatEta, riskRank, useRoute, type RouteOption } from "./route-context"
 
@@ -60,14 +60,18 @@ function RouteLayer() {
     setStatus,
     setErrorMessage,
     setEstimated,
+    waypoints,
+    setOptimizedOrder,
   } = useRoute()
 
   // Keep the latest origin/destination without forcing a recompute on every
   // dropdown change — recompute only when the user presses "Find Best Route".
   const originRef = useRef(origin)
   const destRef = useRef(destination)
+  const waypointsRef = useRef(waypoints)
   originRef.current = origin
   destRef.current = destination
+  waypointsRef.current = waypoints
 
   // Compute routes via the Routes API (initial load + each Find request).
   useEffect(() => {
@@ -82,40 +86,49 @@ function RouteLayer() {
       return
     }
 
+    const stopNames = waypointsRef.current.filter((w) => w !== originRef.current && w !== destRef.current)
+    const stops = stopNames.map((name) => cities[name])
+
+    setOptimizedOrder(null)
     setStatus("computing")
     fetch("/api/route", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ origin: o, destination: d }),
+      body: JSON.stringify({ origin: o, destination: d, waypoints: stops, optimize: stops.length > 1 }),
     })
       .then((res) => res.json())
-      .then((json: { routes?: { path: LatLng[]; distanceKm: number; durationMin: number; summary: string }[] }) => {
-        if (cancelled) return
-        const raw = json.routes ?? []
-        if (raw.length === 0) {
-          // Routes API unavailable — fall back to a geodesic estimate.
-          setRoutes([estimateRoute(originRef.current, destRef.current)])
+      .then(
+        (json: {
+          routes?: { path: LatLng[]; distanceKm: number; durationMin: number; summary: string; optimizedOrder?: number[] }[]
+        }) => {
+          if (cancelled) return
+          const raw = json.routes ?? []
+          if (raw.length === 0) {
+            // Routes API unavailable — fall back to a geodesic estimate.
+            setRoutes([estimateRoute(originRef.current, destRef.current)])
+            setSelectedIndex(0)
+            setEstimated(true)
+            setErrorMessage(null)
+            setStatus("done")
+            return
+          }
+          const opts: RouteOption[] = raw.map((r) => ({
+            path: r.path,
+            distanceKm: r.distanceKm,
+            durationMin: r.durationMin,
+            etaLabel: formatEta(r.durationMin),
+            risk: deriveRisk(r.distanceKm, r.durationMin),
+            summary: r.summary,
+          }))
+          // Best route first: lowest risk, then fastest.
+          opts.sort((a, b) => riskRank[a.risk] - riskRank[b.risk] || a.durationMin - b.durationMin)
+          setRoutes(opts)
           setSelectedIndex(0)
-          setEstimated(true)
-          setErrorMessage(null)
+          setEstimated(false)
+          setOptimizedOrder(raw[0]?.optimizedOrder ?? null)
           setStatus("done")
-          return
-        }
-        const opts: RouteOption[] = raw.map((r) => ({
-          path: r.path,
-          distanceKm: r.distanceKm,
-          durationMin: r.durationMin,
-          etaLabel: formatEta(r.durationMin),
-          risk: deriveRisk(r.distanceKm, r.durationMin),
-          summary: r.summary,
-        }))
-        // Best route first: lowest risk, then fastest.
-        opts.sort((a, b) => riskRank[a.risk] - riskRank[b.risk] || a.durationMin - b.durationMin)
-        setRoutes(opts)
-        setSelectedIndex(0)
-        setEstimated(false)
-        setStatus("done")
-      })
+        },
+      )
       .catch(() => {
         if (cancelled) return
         setRoutes([estimateRoute(originRef.current, destRef.current)])
@@ -172,6 +185,22 @@ function RouteLayer() {
       }),
     )
 
+    const stopNames = waypointsRef.current.filter((w) => w !== originRef.current && w !== destRef.current)
+    stopNames.forEach((name, idx) => {
+      const pos = cities[name]
+      if (!pos) return
+      markers.push(
+        new markerLib.Marker({
+          position: pos,
+          map,
+          icon: pin("#7c3aed", "dot"),
+          label: { text: String(idx + 1), color: "#ffffff", fontSize: "11px", fontWeight: "700" },
+          title: `Stop ${idx + 1}: ${name}`,
+          zIndex: 9,
+        }),
+      )
+    })
+
     const info = new mapsLib.InfoWindow()
     const showIncidents = originRef.current === "Guwahati" && destRef.current === "Shillong"
     if (showIncidents) {
@@ -207,8 +236,29 @@ function RouteLayer() {
 }
 
 function RouteInputs() {
-  const { origin, destination, setOrigin, setDestination, swap, findRoute, status, errorMessage, estimated } = useRoute()
+  const {
+    origin,
+    destination,
+    setOrigin,
+    setDestination,
+    swap,
+    findRoute,
+    status,
+    errorMessage,
+    estimated,
+    waypoints,
+    addWaypoint,
+    removeWaypoint,
+    optimizedOrder,
+  } = useRoute()
   const computing = status === "computing"
+  const stopChoices = cityNames.filter((c) => c !== origin && c !== destination && !waypoints.includes(c))
+  const activeStops = waypoints.filter((w) => w !== origin && w !== destination)
+
+  const optimizedStopOrder =
+    optimizedOrder && optimizedOrder.length === activeStops.length
+      ? optimizedOrder.map((i) => activeStops[i])
+      : null
 
   return (
     <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-col gap-2">
@@ -261,8 +311,40 @@ function RouteInputs() {
           className="pointer-events-auto flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {computing ? <Loader2 className="size-4 animate-spin" /> : <Navigation className="size-4" />}
-          {computing ? "Finding..." : "Find Best Route"}
+          {computing ? "Finding..." : activeStops.length > 1 ? "Optimize Route" : "Find Best Route"}
         </button>
+      </div>
+
+      <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 py-1.5 shadow-sm backdrop-blur">
+        <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+          <Waypoints className="size-3.5" /> Stops:
+        </span>
+        {activeStops.length === 0 && <span className="text-xs text-muted-foreground">None — add multi-stop cities to optimize order</span>}
+        {activeStops.map((c, i) => (
+          <span
+            key={c}
+            className="flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-foreground"
+          >
+            {i + 1}. {c}
+            <button type="button" onClick={() => removeWaypoint(c)} aria-label={`Remove ${c}`} className="text-muted-foreground hover:text-foreground">
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        {stopChoices.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => e.target.value && addWaypoint(e.target.value)}
+            className="cursor-pointer rounded-md border border-dashed border-border bg-transparent px-1.5 py-0.5 text-xs font-medium text-muted-foreground outline-none"
+          >
+            <option value="">+ Add stop</option>
+            {stopChoices.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {errorMessage && (
@@ -273,6 +355,12 @@ function RouteInputs() {
       {!errorMessage && estimated && status === "done" && (
         <p className="pointer-events-auto w-fit rounded-md bg-risk-moderate-bg px-2.5 py-1 text-xs font-medium text-risk-moderate">
           Estimated path — enable the Google Routes API for live turn-by-turn routing.
+        </p>
+      )}
+      {!errorMessage && optimizedStopOrder && status === "done" && (
+        <p className="pointer-events-auto flex w-fit items-center gap-1.5 rounded-md bg-info-bg px-2.5 py-1 text-xs font-medium text-info">
+          <Waypoints className="size-3.5 shrink-0" />
+          Optimized stop order: {origin} → {optimizedStopOrder.join(" → ")} → {destination}
         </p>
       )}
     </div>
