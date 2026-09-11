@@ -32,6 +32,11 @@ type RouteContextValue = {
   setSelectedIndex: (i: number) => void
   estimated: boolean
   setEstimated: (v: boolean) => void
+  waypoints: string[]
+  addWaypoint: (c: string) => void
+  removeWaypoint: (c: string) => void
+  optimizedOrder: number[] | null
+  setOptimizedOrder: (o: number[] | null) => void
 }
 
 const RouteContext = createContext<RouteContextValue | null>(null)
@@ -91,6 +96,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const [routes, setRoutes] = useState<RouteOption[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [estimated, setEstimated] = useState(false)
+  const [waypoints, setWaypoints] = useState<string[]>([])
+  const [optimizedOrder, setOptimizedOrder] = useState<number[] | null>(null)
 
   const swap = useCallback(() => {
     setOrigin((prevOrigin) => {
@@ -98,6 +105,14 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       return destination
     })
   }, [destination])
+
+  const addWaypoint = useCallback((c: string) => {
+    setWaypoints((prev) => (prev.includes(c) ? prev : [...prev, c]))
+  }, [])
+
+  const removeWaypoint = useCallback((c: string) => {
+    setWaypoints((prev) => prev.filter((w) => w !== c))
+  }, [])
 
   const findRoute = useCallback(() => {
     setErrorMessage(null)
@@ -124,8 +139,28 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       setSelectedIndex,
       estimated,
       setEstimated,
+      waypoints,
+      addWaypoint,
+      removeWaypoint,
+      optimizedOrder,
+      setOptimizedOrder,
     }),
-    [origin, destination, swap, findRoute, requestId, status, errorMessage, routes, selectedIndex, estimated],
+    [
+      origin,
+      destination,
+      swap,
+      findRoute,
+      requestId,
+      status,
+      errorMessage,
+      routes,
+      selectedIndex,
+      estimated,
+      waypoints,
+      addWaypoint,
+      removeWaypoint,
+      optimizedOrder,
+    ],
   )
 
   return <RouteContext.Provider value={value}>{children}</RouteContext.Provider>

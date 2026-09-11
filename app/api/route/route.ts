@@ -3,31 +3,57 @@ import { NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
 
 type LatLng = { lat: number; lng: number }
-type Body = { origin?: LatLng; destination?: LatLng }
+type Body = { origin?: LatLng; destination?: LatLng; waypoints?: LatLng[]; optimize?: boolean }
 
 type RouteResult = {
   path: LatLng[]
   distanceKm: number
   durationMin: number
   summary: string
+  optimizedOrder?: number[]
 }
 
-async function computeWithKey(apiKey: string, origin: LatLng, destination: LatLng) {
+async function computeWithKey(
+  apiKey: string,
+  origin: LatLng,
+  destination: LatLng,
+  waypoints: LatLng[],
+  optimize: boolean,
+) {
+  const hasWaypoints = waypoints.length > 0
+  const wantOptimize = hasWaypoints && optimize && waypoints.length > 1
+
+  const fieldMask = [
+    "routes.duration",
+    "routes.distanceMeters",
+    "routes.polyline.geoJsonLinestring",
+    "routes.description",
+    wantOptimize ? "routes.optimizedIntermediateWaypointIndex" : null,
+  ]
+    .filter(Boolean)
+    .join(",")
+
   const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
     method: "POST",
     cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask":
-        "routes.duration,routes.distanceMeters,routes.polyline.geoJsonLinestring,routes.description",
+      "X-Goog-FieldMask": fieldMask,
     },
     body: JSON.stringify({
       origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
       destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+      ...(hasWaypoints
+        ? {
+            intermediates: waypoints.map((w) => ({ location: { latLng: { latitude: w.lat, longitude: w.lng } } })),
+          }
+        : {}),
       travelMode: "DRIVE",
       routingPreference: "TRAFFIC_AWARE",
-      computeAlternativeRoutes: true,
+      // Waypoint optimization and route alternatives are mutually exclusive.
+      computeAlternativeRoutes: !hasWaypoints,
+      optimizeWaypointOrder: wantOptimize,
       polylineEncoding: "GEO_JSON_LINESTRING",
     }),
   })
@@ -46,13 +72,16 @@ async function computeWithKey(apiKey: string, origin: LatLng, destination: LatLn
       distanceKm: Math.round((r?.distanceMeters ?? 0) / 1000),
       durationMin: Math.round(parseInt(String(r?.duration ?? "0").replace("s", ""), 10) / 60),
       summary: r?.description || "Alternate route",
+      optimizedOrder: r?.optimizedIntermediateWaypointIndex ?? undefined,
     }
   })
   return { ok: true as const, routes }
 }
 
 export async function POST(request: Request) {
-  const { origin, destination } = (await request.json().catch(() => ({}))) as Body
+  const { origin, destination, waypoints = [], optimize = false } = (await request
+    .json()
+    .catch(() => ({}))) as Body
 
   // The map key and the server key may belong to different Google Cloud
   // projects. Try every distinct key so routing works as long as ANY of them
@@ -67,7 +96,7 @@ export async function POST(request: Request) {
   let lastStatus = 502
   try {
     for (const key of keys) {
-      const result = await computeWithKey(key, origin, destination)
+      const result = await computeWithKey(key, origin, destination, waypoints, optimize)
       if (result.ok) {
         return NextResponse.json({ routes: result.routes })
       }
