@@ -1,9 +1,7 @@
 import { cn } from "@/lib/utils"
 
 export function Panel({ className, children }: { className?: string; children: React.ReactNode }) {
-  return (
-    <div className={cn("rounded-xl border border-border bg-card shadow-sm", className)}>{children}</div>
-  )
+  return <div className={cn("rounded-md border border-border bg-card", className)}>{children}</div>
 }
 
 export function PanelHeader({
@@ -16,10 +14,10 @@ export function PanelHeader({
   action?: React.ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between px-4 pt-4 pb-3">
-      <h3 className="text-sm font-semibold text-card-foreground">
+    <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+      <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {title}
-        {typeof count === "number" && <span className="text-muted-foreground"> ({count})</span>}
+        {typeof count === "number" && <span className="text-foreground/70"> · {count}</span>}
       </h3>
       {action}
     </div>
