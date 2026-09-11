@@ -7,9 +7,9 @@ const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'NER LogiSense — AI Logistics & Accessibility Intelligence',
+  title: 'Jan Report — AI Logistics & Accessibility Intelligence',
   description:
-    'AI-powered smart logistics and accessibility intelligence platform for the North Eastern Region: real-time route risk, GPS tracking, weather alerts, and field reporting.',
+    'Jan Report is an AI-powered smart logistics and accessibility intelligence platform for the North Eastern Region: real-time route risk, GPS tracking, weather alerts, and field reporting.',
   generator: 'v0.app',
 }
 
