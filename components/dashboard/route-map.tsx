@@ -39,9 +39,10 @@ function RouteLayer() {
   const map = useMap()
   const mapsLib = useMapsLibrary("maps")
   const coreLib = useMapsLibrary("core")
+  const markerLib = useMapsLibrary("marker")
 
   useEffect(() => {
-    if (!map || !mapsLib || !coreLib) return
+    if (!map || !mapsLib || !coreLib || !markerLib) return
 
     const polyline = new mapsLib.Polyline({
       path: activeRoutePath,
@@ -55,7 +56,7 @@ function RouteLayer() {
     const markers: google.maps.Marker[] = []
 
     markers.push(
-      new mapsLib.Marker({
+      new markerLib.Marker({
         position: recommendedRoute.origin,
         map,
         icon: pin("#16a34a", "start"),
@@ -64,7 +65,7 @@ function RouteLayer() {
       }),
     )
     markers.push(
-      new mapsLib.Marker({
+      new markerLib.Marker({
         position: recommendedRoute.destination,
         map,
         icon: pin("#dc2626", "end"),
@@ -75,7 +76,7 @@ function RouteLayer() {
 
     const info = new mapsLib.InfoWindow()
     incidents.forEach((inc) => {
-      const m = new mapsLib.Marker({
+      const m = new markerLib.Marker({
         position: inc.position,
         map,
         icon: pin(incidentColors[inc.level], "dot"),
@@ -99,7 +100,7 @@ function RouteLayer() {
       markers.forEach((m) => m.setMap(null))
       info.close()
     }
-  }, [map, mapsLib, coreLib])
+  }, [map, mapsLib, coreLib, markerLib])
 
   return null
 }
