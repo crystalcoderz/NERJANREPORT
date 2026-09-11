@@ -1,11 +1,23 @@
 import { generateText } from "ai"
+import { createGoogleGenerativeAI } from "@ai-sdk/google"
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
 
-const GEMINI = "google/gemini-3-flash"
-const KIMI = "moonshotai/kimi-k2"
+const GEMINI_MODEL = "gemini-3.6-flash"
+const KIMI_MODEL = "kimi-k3"
+
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+})
+
+const moonshot = createOpenAICompatible({
+  name: "moonshot",
+  apiKey: process.env.MOONSHOT_API_KEY,
+  baseURL: "https://api.moonshot.ai/v1",
+})
 
 type Body = {
   from?: string
@@ -43,20 +55,20 @@ export async function POST(request: Request) {
 
   try {
     const { text } = await generateText({
-      model: GEMINI,
+      model: google(GEMINI_MODEL),
       prompt,
       temperature: 0.4,
     })
-    return NextResponse.json({ provider: "Gemini", model: GEMINI, analysis: text.trim() })
+    return NextResponse.json({ provider: "Gemini", model: GEMINI_MODEL, analysis: text.trim() })
   } catch (geminiError) {
     console.log("Gemini failed, falling back to Kimi:", (geminiError as Error).message)
     try {
       const { text } = await generateText({
-        model: KIMI,
+        model: moonshot(KIMI_MODEL),
         prompt,
         temperature: 0.4,
       })
-      return NextResponse.json({ provider: "Kimi (fallback)", model: KIMI, analysis: text.trim() })
+      return NextResponse.json({ provider: "Kimi (fallback)", model: KIMI_MODEL, analysis: text.trim() })
     } catch (kimiError) {
       console.log("Kimi also failed:", (kimiError as Error).message)
       return NextResponse.json(
