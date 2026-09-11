@@ -130,6 +130,17 @@ export const otherRoutes = [
   },
 ]
 
+export type Driver = { id: string; name: string; vehicle: string }
+
+export const drivers: Driver[] = [
+  { id: "d-1", name: "Rahul Deka", vehicle: "AS-01 TC 4821 · Truck" },
+  { id: "d-2", name: "Bhaskar Nongrum", vehicle: "ML-05 AB 1190 · Truck" },
+  { id: "d-3", name: "Imlong Ao", vehicle: "NL-04 CD 3327 · Van" },
+  { id: "d-4", name: "Zosangzuala", vehicle: "MZ-01 EF 2204 · Truck" },
+  { id: "d-5", name: "Sanjib Barman", vehicle: "AS-25 GH 7710 · Truck" },
+  { id: "d-6", name: "Nokmi Wangsa", vehicle: "AR-02 JK 5561 · Van" },
+]
+
 export type ShipmentStatus = "In Transit" | "Scheduled" | "Delayed"
 
 export const shipments: {
