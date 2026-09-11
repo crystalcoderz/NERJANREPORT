@@ -11,10 +11,11 @@ import {
   Droplets,
   Wind,
   Eye,
-  MoreHorizontal,
+  MapPin,
 } from "lucide-react"
 import { cities } from "@/lib/data"
 import { Panel } from "./panel"
+import { useRoute } from "./route-context"
 
 const icons = {
   clear: Sun,
@@ -39,16 +40,17 @@ type Weather = {
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 export function WeatherPanel() {
-  const { lat, lng } = cities.Guwahati
+  const { origin } = useRoute()
+  const city = cities[origin] ?? cities.Guwahati
   const { data } = useSWR<Weather>(
-    `/api/weather?lat=${lat}&lng=${lng}&place=${encodeURIComponent("Guwahati, Assam")}`,
+    `/api/weather?lat=${city.lat}&lng=${city.lng}&place=${encodeURIComponent(origin)}`,
     fetcher,
     { refreshInterval: 300000 },
   )
 
   const w: Weather = data ?? {
     source: "loading",
-    place: "Guwahati, Assam",
+    place: origin,
     tempC: 24,
     condition: "Light Rain",
     kind: "rain",
@@ -69,12 +71,17 @@ export function WeatherPanel() {
     <Panel className="p-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-semibold text-card-foreground">{w.place}</p>
+          <p className="flex items-center gap-1 text-sm font-semibold text-card-foreground">
+            <MapPin className="size-3.5 text-muted-foreground" />
+            {origin}
+          </p>
           <p className="text-xs text-muted-foreground">
             {w.source === "google" ? "Live · Google Weather" : "Sample data"}
           </p>
         </div>
-        <MoreHorizontal className="size-4 text-muted-foreground" />
+        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Origin
+        </span>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-4">
