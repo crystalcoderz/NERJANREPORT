@@ -1,7 +1,12 @@
+"use client"
+
+import useSWR from "swr"
 import { Truck, Cloud, ShieldCheck, TriangleAlert, ArrowUpRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { stats } from "@/lib/data"
+import { stats as mockStats } from "@/lib/data"
 import { Panel } from "./panel"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const icons = {
   truck: Truck,
@@ -46,6 +51,24 @@ function Sparkline({ data, tone }: { data: number[]; tone: string }) {
 }
 
 export function StatCards() {
+  const { data } = useSWR<{ source: string; alerts: unknown[] }>("/api/weather-alerts", fetcher, {
+    refreshInterval: 60000,
+  })
+
+  const liveAlertCount = data?.alerts?.length
+  const previousCount = mockStats.find((s) => s.id === "weather")?.spark.at(-2) ?? liveAlertCount
+
+  const stats = mockStats.map((s) => {
+    if (s.id !== "weather" || liveAlertCount === undefined) return s
+    const delta = previousCount ? liveAlertCount - previousCount : 0
+    return {
+      ...s,
+      value: String(liveAlertCount),
+      delta: delta === 0 ? "±0" : `${delta > 0 ? "+" : ""}${delta}`,
+      spark: [...s.spark.slice(1), liveAlertCount],
+    }
+  })
+
   return (
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
       {stats.map((s) => {

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
 
 type NormalizedWeather = {
-  source: "google" | "mock"
+  source: "weatherapi" | "mock"
   place: string
   tempC: number
   condition: string
@@ -11,21 +11,18 @@ type NormalizedWeather = {
   precipPercent: number
   windKph: number
   visibilityKm: number
+  humidity: number
+  updatedAt: string | null
 }
 
-const KIND_MAP: Record<string, string> = {
-  CLEAR: "clear",
-  MOSTLY_CLEAR: "clear",
-  PARTLY_CLOUDY: "cloudy",
-  MOSTLY_CLOUDY: "cloudy",
-  CLOUDY: "cloudy",
-  RAIN: "rain",
-  LIGHT_RAIN: "rain",
-  HEAVY_RAIN: "rain",
-  RAIN_SHOWERS: "rain",
-  THUNDERSTORM: "storm",
-  FOG: "fog",
-  SNOW: "snow",
+function classifyKind(text: string): string {
+  const t = text.toLowerCase()
+  if (t.includes("thunder")) return "storm"
+  if (t.includes("snow") || t.includes("sleet") || t.includes("ice")) return "snow"
+  if (t.includes("fog") || t.includes("mist")) return "fog"
+  if (t.includes("rain") || t.includes("drizzle") || t.includes("shower")) return "rain"
+  if (t.includes("cloud") || t.includes("overcast")) return "cloudy"
+  return "clear"
 }
 
 function mock(place: string): NormalizedWeather {
@@ -38,6 +35,8 @@ function mock(place: string): NormalizedWeather {
     precipPercent: 45,
     windKph: 14,
     visibilityKm: 6,
+    humidity: 70,
+    updatedAt: null,
   }
 }
 
@@ -47,30 +46,35 @@ export async function GET(request: Request) {
   const lng = searchParams.get("lng")
   const place = searchParams.get("place") ?? "Guwahati, Assam"
 
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  const apiKey = process.env.WEATHERAPI_KEY
 
   if (!apiKey || !lat || !lng) {
     return NextResponse.json(mock(place))
   }
 
   try {
-    const url = `https://weather.googleapis.com/v1/currentConditions:lookup?key=${apiKey}&location.latitude=${lat}&location.longitude=${lng}`
+    const url = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${lat},${lng}&days=1&aqi=no&alerts=no`
     const res = await fetch(url, { cache: "no-store" })
     if (!res.ok) {
       return NextResponse.json(mock(place))
     }
     const data = await res.json()
 
-    const type: string = data?.weatherCondition?.type ?? "CLOUDY"
+    const current = data?.current
+    const today = data?.forecast?.forecastday?.[0]?.day
+    const conditionText: string = current?.condition?.text ?? "Cloudy"
+
     const normalized: NormalizedWeather = {
-      source: "google",
+      source: "weatherapi",
       place,
-      tempC: Math.round(data?.temperature?.degrees ?? 24),
-      condition: data?.weatherCondition?.description?.text ?? "Cloudy",
-      kind: KIND_MAP[type] ?? "cloudy",
-      precipPercent: Math.round(data?.precipitation?.probability?.percent ?? 0),
-      windKph: Math.round(data?.wind?.speed?.value ?? 0),
-      visibilityKm: Math.round(data?.visibility?.distance ?? 0),
+      tempC: Math.round(current?.temp_c ?? 24),
+      condition: conditionText,
+      kind: classifyKind(conditionText),
+      precipPercent: Math.round(today?.daily_chance_of_rain ?? (current?.precip_mm > 0 ? 60 : 0)),
+      windKph: Math.round(current?.wind_kph ?? 0),
+      visibilityKm: Math.round(current?.vis_km ?? 0),
+      humidity: Math.round(current?.humidity ?? 0),
+      updatedAt: current?.last_updated ?? null,
     }
     return NextResponse.json(normalized)
   } catch {
