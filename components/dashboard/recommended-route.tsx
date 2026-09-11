@@ -6,6 +6,7 @@ import { ArrowRight, Route, Clock, ShieldCheck, ShieldAlert, Shield, Sparkles, R
 import { cities, incidents, type RiskLevel } from "@/lib/data"
 import { Panel } from "./panel"
 import { useRoute } from "./route-context"
+import { SubmitTripDialog } from "./submit-trip-dialog"
 
 type Analysis = { provider: string; analysis: string }
 type Weather = { condition: string; tempC: number; visibilityKm: number }
@@ -24,15 +25,18 @@ const riskUi: Record<RiskLevel, { label: string; className: string; badge: strin
 }
 
 export function RecommendedRoute() {
-  const { origin, destination, routes, selectedIndex, status } = useRoute()
+  const { origin, destination, routes, selectedIndex, status, waypoints, optimizedOrder } = useRoute()
   const sel = routes[selectedIndex]
 
   const from = sel ? origin : "Guwahati"
   const to = sel ? destination : "Shillong"
   const distanceKm = sel ? sel.distanceKm : 100
+  const durationMin = sel ? sel.durationMin : 190
   const etaLabel = sel ? sel.etaLabel : "3 hr 10 min"
   const risk: RiskLevel = sel ? sel.risk : "low"
   const ui = riskUi[risk]
+
+  const orderedWaypoints = optimizedOrder ? optimizedOrder.map((i) => waypoints[i]).filter(Boolean) : waypoints
 
   const originCity = cities[from] ?? cities.Guwahati
   const { data: weather } = useSWR<Weather>(
@@ -118,10 +122,21 @@ export function RecommendedRoute() {
         </span>
       </div>
 
-      <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-foreground">
-        {from}
-        <ArrowRight className="size-4 text-muted-foreground" />
-        {to}
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          {from}
+          <ArrowRight className="size-4 text-muted-foreground" />
+          {to}
+        </div>
+        <SubmitTripDialog
+          origin={from}
+          destination={to}
+          waypoints={orderedWaypoints}
+          distanceKm={distanceKm}
+          durationMin={durationMin}
+          risk={risk}
+          onSubmitted={() => {}}
+        />
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2">

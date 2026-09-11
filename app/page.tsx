@@ -8,6 +8,7 @@ import { UpcomingShipments } from "@/components/dashboard/upcoming-shipments"
 import { WeatherAlerts } from "@/components/dashboard/weather-alerts"
 import { NewsUpdates } from "@/components/dashboard/news-updates"
 import { FieldReportsPanel } from "@/components/dashboard/field-reports-panel"
+import { ActiveTripsPanel } from "@/components/dashboard/active-trips-panel"
 import { RouteProvider } from "@/components/dashboard/route-context"
 
 export default function Page() {
@@ -53,6 +54,7 @@ export default function Page() {
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
           <UpcomingShipments />
+          <ActiveTripsPanel />
           <WeatherAlerts />
           <NewsUpdates />
           <FieldReportsPanel />
