@@ -1,10 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import useSWR from "swr"
 import { APIProvider, Map, useMap, useMapsLibrary } from "@vis.gl/react-google-maps"
-import { MapPin, Navigation, ArrowLeftRight, KeyRound, Loader2, Waypoints, X } from "lucide-react"
-import { cities, incidents, type LatLng } from "@/lib/data"
+import { MapPin, Navigation, ArrowLeftRight, KeyRound, Loader2, Waypoints, X, Sparkles } from "lucide-react"
+import { cities, type LatLng } from "@/lib/data"
+import type { LiveIncident } from "@/app/api/incidents/route"
 import { deriveRisk, estimateRoute, formatEta, riskRank, useRoute, type RouteOption } from "./route-context"
+
+const incidentsFetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const cityNames = Object.keys(cities)
@@ -43,7 +47,7 @@ function pin(color: string, glyph: "start" | "end" | "dot") {
   } as google.maps.Icon
 }
 
-function RouteLayer() {
+function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
   const map = useMap()
   const mapsLib = useMapsLibrary("maps")
   const coreLib = useMapsLibrary("core")
@@ -202,24 +206,30 @@ function RouteLayer() {
     })
 
     const info = new mapsLib.InfoWindow()
-    const showIncidents = originRef.current === "Guwahati" && destRef.current === "Shillong"
-    if (showIncidents) {
-      incidents.forEach((inc) => {
-        const m = new markerLib.Marker({
-          position: inc.position,
-          map,
-          icon: pin(incidentColors[inc.level], "dot"),
-          title: inc.title,
-        })
-        m.addListener("click", () => {
-          info.setContent(
-            `<div style="font-family:system-ui;font-size:12px;max-width:180px"><strong>${inc.title}</strong><br/>${inc.detail}</div>`,
-          )
-          info.open(map, m)
-        })
-        markers.push(m)
+    const corridorKey = `${originRef.current} to ${destRef.current}`.toLowerCase()
+    const relevantIncidents = incidents.filter((inc) => {
+      if (inc.lat == null || inc.lng == null) return false
+      const corridor = inc.corridor.toLowerCase()
+      return (
+        corridor === corridorKey ||
+        (corridor.includes(originRef.current.toLowerCase()) && corridor.includes(destRef.current.toLowerCase()))
+      )
+    })
+    relevantIncidents.forEach((inc) => {
+      const m = new markerLib.Marker({
+        position: { lat: inc.lat as number, lng: inc.lng as number },
+        map,
+        icon: pin(incidentColors[inc.level] ?? incidentColors.moderate, "dot"),
+        title: inc.title,
       })
-    }
+      m.addListener("click", () => {
+        info.setContent(
+          `<div style="font-family:system-ui;font-size:12px;max-width:180px"><strong>${inc.title}</strong><br/>${inc.detail}</div>`,
+        )
+        info.open(map, m)
+      })
+      markers.push(m)
+    })
 
     const bounds = new coreLib.LatLngBounds()
     sel.path.forEach((p: LatLng) => bounds.extend(p))
@@ -367,7 +377,7 @@ function RouteInputs() {
   )
 }
 
-function Legend() {
+function Legend({ source, generatedBy }: { source?: string; generatedBy?: string | null }) {
   const rows = [
     { c: "bg-risk-low", t: "Low Risk" },
     { c: "bg-risk-moderate", t: "Moderate Risk" },
@@ -384,6 +394,11 @@ function Legend() {
           </li>
         ))}
       </ul>
+      {source === "ai" && (
+        <p className="mt-2 flex items-center gap-1 border-t border-border pt-2 text-[10px] font-medium text-info">
+          <Sparkles className="size-3" /> Live incidents{generatedBy ? ` · ${generatedBy}` : ""}
+        </p>
+      )}
     </div>
   )
 }
@@ -407,6 +422,14 @@ export function RouteMap() {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
 
+  const { data: incidentsData } = useSWR<{ source: string; incidents: LiveIncident[] }>(
+    "/api/incidents",
+    incidentsFetcher,
+    { refreshInterval: 30000 },
+  )
+  const liveIncidents = incidentsData?.incidents ?? []
+  const generatedBy = liveIncidents.find((i) => i.model)?.model ?? null
+
   return (
     <div className="relative min-h-[420px] w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <RouteInputs />
@@ -421,13 +444,13 @@ export function RouteMap() {
             className="h-full min-h-[420px] w-full"
             style={{ width: "100%", height: "100%" }}
           >
-            <RouteLayer />
+            <RouteLayer incidents={liveIncidents} />
           </Map>
         </APIProvider>
       ) : (
         <MissingKey />
       )}
-      <Legend />
+      <Legend source={incidentsData?.source} generatedBy={generatedBy} />
     </div>
   )
 }

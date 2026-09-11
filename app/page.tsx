@@ -9,6 +9,7 @@ import { WeatherAlerts } from "@/components/dashboard/weather-alerts"
 import { NewsUpdates } from "@/components/dashboard/news-updates"
 import { FieldReportsPanel } from "@/components/dashboard/field-reports-panel"
 import { ActiveTripsPanel } from "@/components/dashboard/active-trips-panel"
+import { IncidentMonitor } from "@/components/dashboard/incident-monitor"
 import { RouteProvider } from "@/components/dashboard/route-context"
 
 export default function Page() {
@@ -22,6 +23,7 @@ export default function Page() {
 
   return (
     <main className="min-h-screen bg-background">
+      <IncidentMonitor />
       <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2">

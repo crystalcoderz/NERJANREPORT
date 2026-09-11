@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react"
 import useSWR from "swr"
 import { ArrowRight, Route, Clock, ShieldCheck, ShieldAlert, Shield, Sparkles, RefreshCw } from "lucide-react"
-import { cities, incidents, type RiskLevel } from "@/lib/data"
+import { cities, type RiskLevel } from "@/lib/data"
+import type { LiveIncident } from "@/app/api/incidents/route"
 import { Panel } from "./panel"
 import { useRoute } from "./route-context"
 import { SubmitTripDialog } from "./submit-trip-dialog"
@@ -45,6 +46,14 @@ export function RecommendedRoute() {
     { refreshInterval: 300000 },
   )
 
+  const { data: incidentsData } = useSWR<{ incidents: LiveIncident[] }>("/api/incidents", fetcher, {
+    refreshInterval: 30000,
+  })
+  const corridorIncidents = (incidentsData?.incidents ?? []).filter((inc) => {
+    const corridor = inc.corridor.toLowerCase()
+    return corridor.includes(from.toLowerCase()) && corridor.includes(to.toLowerCase())
+  })
+
   const [data, setData] = useState<Analysis | null>(null)
   const [loading, setLoading] = useState(false)
   const runIdRef = useRef(0)
@@ -68,10 +77,7 @@ export function RecommendedRoute() {
         etaLabel,
         risk,
         weather: weatherText,
-        incidents:
-          from === "Guwahati" && to === "Shillong"
-            ? incidents.map((i) => ({ title: i.title, level: i.level }))
-            : [],
+        incidents: corridorIncidents.map((i) => ({ title: i.title, level: i.level })),
       }),
     })
       .then((res) => res.json())
@@ -85,7 +91,7 @@ export function RecommendedRoute() {
         if (runId === runIdRef.current) setLoading(false)
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to, distanceKm, etaLabel, risk, status, weather?.condition])
+  }, [from, to, distanceKm, etaLabel, risk, status, weather?.condition, corridorIncidents.length])
 
   const rerun = () => {
     // Bump the run id to force a fresh analysis with current inputs.

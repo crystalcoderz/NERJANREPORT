@@ -4,6 +4,9 @@ import useSWR from "swr"
 import { Truck, Cloud, ShieldCheck, TriangleAlert, ArrowUpRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { stats as mockStats } from "@/lib/data"
+import { deriveTripStatus } from "@/lib/trip-status"
+import type { Trip } from "@/app/api/trips/route"
+import type { LiveIncident } from "@/app/api/incidents/route"
 import { Panel } from "./panel"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -54,18 +57,46 @@ export function StatCards() {
   const { data } = useSWR<{ source: string; alerts: unknown[] }>("/api/weather-alerts", fetcher, {
     refreshInterval: 60000,
   })
+  const { data: tripsData } = useSWR<{ trips: Trip[] }>("/api/trips", fetcher, {
+    refreshInterval: 15000,
+  })
+  const { data: incidentsData } = useSWR<{ incidents: LiveIncident[] }>("/api/incidents", fetcher, {
+    refreshInterval: 30000,
+  })
 
   const liveAlertCount = data?.alerts?.length
-  const previousCount = mockStats.find((s) => s.id === "weather")?.spark.at(-2) ?? liveAlertCount
+
+  const trips = tripsData?.trips
+  const activeShipmentCount = trips?.filter((t) => deriveTripStatus(t).label !== "Completed").length
+  const onTimePct =
+    trips && trips.length > 0
+      ? Math.round((trips.filter((t) => deriveTripStatus(t).label !== "Overdue").length / trips.length) * 100)
+      : undefined
+
+  const incidentList = incidentsData?.incidents
+  const highRiskRouteCount = incidentList
+    ? new Set(incidentList.filter((i) => i.level === "high").map((i) => i.corridor)).size
+    : undefined
+
+  const liveValues: Record<string, number | undefined> = {
+    active: activeShipmentCount,
+    weather: liveAlertCount,
+    ontime: onTimePct,
+    risk: highRiskRouteCount,
+  }
 
   const stats = mockStats.map((s) => {
-    if (s.id !== "weather" || liveAlertCount === undefined) return s
-    const delta = previousCount ? liveAlertCount - previousCount : 0
+    const liveValue = liveValues[s.id]
+    if (liveValue === undefined) return s
+    const previous = s.spark.at(-2) ?? liveValue
+    const delta = liveValue - previous
+    const suffix = s.id === "ontime" ? "%" : ""
+    const deltaSuffix = s.id === "ontime" ? "%" : ""
     return {
       ...s,
-      value: String(liveAlertCount),
-      delta: delta === 0 ? "±0" : `${delta > 0 ? "+" : ""}${delta}`,
-      spark: [...s.spark.slice(1), liveAlertCount],
+      value: `${liveValue}${suffix}`,
+      delta: delta === 0 ? "±0" : `${delta > 0 ? "+" : ""}${delta}${deltaSuffix}`,
+      spark: [...s.spark.slice(1), liveValue],
     }
   })
 

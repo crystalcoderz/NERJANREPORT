@@ -63,10 +63,10 @@ export async function POST(request: Request) {
   } catch (geminiError) {
     console.log("Gemini failed, falling back to Kimi:", (geminiError as Error).message)
     try {
+      // Kimi only accepts the default temperature (1); passing any other value errors out.
       const { text } = await generateText({
         model: moonshot(KIMI_MODEL),
         prompt,
-        temperature: 0.4,
       })
       return NextResponse.json({ provider: "Kimi (fallback)", model: KIMI_MODEL, analysis: text.trim() })
     } catch (kimiError) {
