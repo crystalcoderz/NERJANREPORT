@@ -1,47 +1,58 @@
+import { TopBar } from "@/components/dashboard/top-bar"
+import { StatCards } from "@/components/dashboard/stat-cards"
+import { RouteMap } from "@/components/dashboard/route-map"
+import { WeatherPanel } from "@/components/dashboard/weather-panel"
+import { RecommendedRoute } from "@/components/dashboard/recommended-route"
+import { OtherRoutes } from "@/components/dashboard/other-routes"
+import { UpcomingShipments } from "@/components/dashboard/upcoming-shipments"
+import { WeatherAlerts } from "@/components/dashboard/weather-alerts"
+import { NewsUpdates } from "@/components/dashboard/news-updates"
+
 export default function Page() {
+  const now = new Date()
+  const dateLabel = now.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+
   return (
-    <main
-      style={{
-        colorScheme: 'light dark',
-        position: 'relative',
-        display: 'flex',
-        minHeight: '100vh',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'light-dark(#fff, #000)',
-        color: 'light-dark(#000, #fff)',
-      }}
-    >
-      <svg
-        aria-hidden="true"
-        style={{ width: 80, height: 80 }}
-        width={80}
-        height={80}
-        fill="none"
-        viewBox="0 0 20 20"
-        xmlns="http://www.w3.org/2000/svg"
-        stroke="currentColor"
-        strokeWidth="0.5"
-      >
-        <path
-          d="M14.2 14.2H17V6.9375C17 4.76288 15.2371 3 13.0625 3H5.8V5.8M14.2 14.2V7.79063L7.79062 14.2H14.2ZM14.2 14.2V17H6.9375C4.76288 17 3 15.2371 3 13.0625V5.8H5.8M5.8 5.8V12.2313L12.2313 5.8H5.8Z"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <p
-        style={{
-          position: 'absolute',
-          left: '50%',
-          top: 'calc(50% + 56px)',
-          transform: 'translateX(-50%)',
-          whiteSpace: 'nowrap',
-          fontSize: '14px',
-          fontWeight: 500,
-          color: 'light-dark(#71717a, #a1a1aa)',
-        }}
-      >
-        Your v0 generation will show here.
-      </p>
+    <main className="min-h-screen bg-background">
+      <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+              NL
+            </span>
+            <div>
+              <p className="text-sm font-bold leading-tight text-foreground">NER LogiSense</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">Logistics Intelligence</p>
+            </div>
+          </div>
+          <p className="shrink-0 text-xs font-medium text-muted-foreground">{dateLabel}</p>
+        </div>
+
+        <TopBar />
+
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="flex flex-col gap-5 lg:col-span-2">
+            <StatCards />
+            <RouteMap />
+          </div>
+          <div className="flex flex-col gap-5">
+            <WeatherPanel />
+            <RecommendedRoute />
+            <OtherRoutes />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <UpcomingShipments />
+          <WeatherAlerts />
+          <NewsUpdates />
+        </div>
+      </div>
     </main>
   )
 }
