@@ -17,19 +17,41 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const next = searchParams.get("next") ?? "/"
 
+  const REQUEST_TIMEOUT_MS = 20_000
+
+  const postJson = async (url: string, body: Record<string, string>) => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error ?? "Something went wrong. Please try again.")
+      return data
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        throw new Error("The request timed out. Check your connection and try again.")
+      }
+      if (err instanceof TypeError) {
+        throw new Error("Network error. Check your connection and try again.")
+      }
+      throw err
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
+
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error ?? "Something went wrong. Please try again.")
+      await postJson("/api/auth/send-otp", { email })
       setStep("code")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
@@ -44,13 +66,7 @@ function LoginForm() {
     setError(null)
 
     try {
-      const response = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error ?? "Something went wrong. Please try again.")
+      await postJson("/api/auth/verify-otp", { email, code })
       // Use a hard navigation instead of router.push/refresh so the new session
       // cookie is guaranteed to be picked up on the next request.
       window.location.assign(next)
