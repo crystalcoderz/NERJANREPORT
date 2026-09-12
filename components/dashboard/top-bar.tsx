@@ -1,4 +1,5 @@
-import { Bell, Search, ChevronDown } from "lucide-react"
+import Link from "next/link"
+import { Bell, Search, ChevronDown, Settings } from "lucide-react"
 
 function getGreetingName(email: string | null | undefined) {
   if (!email) return "there"
@@ -51,6 +52,14 @@ export function TopBar({ userEmail }: { userEmail?: string | null }) {
           <Bell className="size-5" />
           <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-risk-high ring-2 ring-card" />
         </button>
+
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          className="flex size-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Settings className="size-5" />
+        </Link>
 
         <div className="flex items-center gap-2 rounded-lg border border-border bg-card py-1.5 pl-1.5 pr-2.5">
           <span className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
