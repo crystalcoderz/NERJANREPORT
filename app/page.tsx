@@ -11,8 +11,10 @@ import { FieldReportsPanel } from "@/components/dashboard/field-reports-panel"
 import { ActiveTripsPanel } from "@/components/dashboard/active-trips-panel"
 import { IncidentMonitor } from "@/components/dashboard/incident-monitor"
 import { RouteProvider } from "@/components/dashboard/route-context"
+import { UserMenu } from "@/components/dashboard/user-menu"
+import { createClient } from "@/lib/supabase/server"
 
-export default function Page() {
+export default async function Page() {
   const now = new Date()
   const dateLabel = now.toLocaleDateString("en-IN", {
     weekday: "short",
@@ -20,6 +22,11 @@ export default function Page() {
     month: "short",
     year: "numeric",
   })
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   return (
     <main className="min-h-screen bg-background">
@@ -35,7 +42,10 @@ export default function Page() {
               <p className="text-[11px] leading-tight text-muted-foreground">Logistics Intelligence</p>
             </div>
           </div>
-          <p className="shrink-0 text-xs font-medium text-muted-foreground">{dateLabel}</p>
+          <div className="flex shrink-0 items-center gap-3">
+            <p className="text-xs font-medium text-muted-foreground">{dateLabel}</p>
+            <UserMenu email={user?.email ?? null} />
+          </div>
         </div>
 
         <TopBar />
