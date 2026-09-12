@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
+import { createServerClient } from "@supabase/ssr"
 import { NextResponse } from "next/server"
 
 const MAX_ATTEMPTS = 5
@@ -67,7 +67,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 })
   }
 
-  const supabase = await createClient()
+  // Build the response up front and let Supabase write the session cookies
+  // directly onto it. Route Handlers cannot reliably propagate cookie
+  // mutations made through next/headers' cookies() back onto a separately
+  // created NextResponse, which was causing the session to silently fail to
+  // persist (the user would verify successfully but land back on the login
+  // page). Attaching cookies straight to this response guarantees the
+  // Set-Cookie headers actually reach the browser.
+  const response = NextResponse.json({ ok: true })
+
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll() {
+        return Object.entries(
+          Object.fromEntries(
+            (request.headers.get("cookie") ?? "")
+              .split(";")
+              .map((pair) => pair.trim())
+              .filter(Boolean)
+              .map((pair) => {
+                const index = pair.indexOf("=")
+                return [pair.slice(0, index), decodeURIComponent(pair.slice(index + 1))]
+              }),
+          ),
+        ).map(([name, value]) => ({ name, value }))
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+      },
+    },
+  })
+
   const { error: verifyError } = await supabase.auth.verifyOtp({
     token_hash: linkData.properties.hashed_token,
     type: "magiclink",
@@ -78,5 +108,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true })
+  return response
 }
