@@ -79,6 +79,15 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true })
 
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    // v0 previews render the app inside a cross-origin iframe, so the
+    // default SameSite=Lax session cookie gets dropped there (it's only
+    // sent for genuine top-level navigations, and this route sets the
+    // cookie from a fetch call, not a navigation). SameSite=None + Secure
+    // keeps it working in the preview iframe as well as normal top-level
+    // use. Without this, verify-otp appeared to succeed but the browser
+    // silently discarded the session cookie, bouncing the user straight
+    // back to the login page.
+    cookieOptions: { sameSite: "none", secure: true },
     cookies: {
       getAll() {
         return Object.entries(
