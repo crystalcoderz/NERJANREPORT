@@ -51,11 +51,11 @@ function LoginForm() {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error ?? "Something went wrong. Please try again.")
-      router.push(next)
-      router.refresh()
+      // Use a hard navigation instead of router.push/refresh so the new session
+      // cookie is guaranteed to be picked up on the next request.
+      window.location.assign(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.")
-    } finally {
       setIsLoading(false)
     }
   }
