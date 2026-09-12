@@ -1,6 +1,7 @@
 "use client"
 
 import useSWR from "swr"
+import { Truck, Cloud, ShieldCheck, TriangleAlert, ArrowUpRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { stats as mockStats } from "@/lib/data"
 import { deriveTripStatus } from "@/lib/trip-status"
@@ -10,23 +11,23 @@ import { Panel } from "./panel"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-const dotStyles: Record<string, string> = {
-  info: "bg-info",
-  moderate: "bg-risk-moderate",
-  low: "bg-risk-low",
-  high: "bg-risk-high",
+const icons = {
+  truck: Truck,
+  cloud: Cloud,
+  check: ShieldCheck,
+  alert: TriangleAlert,
 }
 
-const deltaStyles: Record<string, string> = {
-  info: "text-info",
-  moderate: "text-risk-moderate",
-  low: "text-risk-low",
-  high: "text-risk-high",
+const toneStyles: Record<string, string> = {
+  info: "bg-info-bg text-info",
+  moderate: "bg-risk-moderate-bg text-risk-moderate",
+  low: "bg-risk-low-bg text-risk-low",
+  high: "bg-risk-high-bg text-risk-high",
 }
 
 function Sparkline({ data, tone }: { data: number[]; tone: string }) {
-  const w = 72
-  const h = 18
+  const w = 64
+  const h = 24
   const min = Math.min(...data)
   const max = Math.max(...data)
   const range = max - min || 1
@@ -46,8 +47,8 @@ function Sparkline({ data, tone }: { data: number[]; tone: string }) {
           ? "var(--info)"
           : "var(--risk-low)"
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible opacity-70" aria-hidden="true">
-      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible" aria-hidden="true">
+      <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -100,24 +101,35 @@ export function StatCards() {
   })
 
   return (
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      {stats.map((s) => (
-        <Panel key={s.id} className="p-4">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              {s.label}
-            </span>
-            <span className={cn("size-1.5 shrink-0 rounded-full", dotStyles[s.tone])} aria-hidden="true" />
-          </div>
-          <p className="mt-3 font-mono text-[28px] font-semibold leading-none tabular-nums text-foreground">
-            {s.value}
-          </p>
-          <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-2.5">
-            <span className={cn("font-mono text-xs tabular-nums", deltaStyles[s.tone])}>{s.delta}</span>
-            <Sparkline data={s.spark} tone={s.tone} />
-          </div>
-        </Panel>
-      ))}
+    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      {stats.map((s) => {
+        const Icon = icons[s.icon]
+        return (
+          <Panel key={s.id} className="p-4">
+            <div className="flex items-start justify-between">
+              <span className={cn("flex size-9 items-center justify-center rounded-lg", toneStyles[s.tone])}>
+                <Icon className="size-5" />
+              </span>
+              <Sparkline data={s.spark} tone={s.tone} />
+            </div>
+            <div className="mt-3 flex items-end justify-between">
+              <div>
+                <p className="font-mono text-2xl font-bold leading-none text-foreground">{s.value}</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">{s.label}</p>
+              </div>
+              <span
+                className={cn(
+                  "mb-0.5 inline-flex items-center gap-0.5 text-xs font-semibold",
+                  s.tone === "high" || s.tone === "moderate" ? "text-risk-high" : "text-risk-low",
+                )}
+              >
+                <ArrowUpRight className="size-3" />
+                {s.delta}
+              </span>
+            </div>
+          </Panel>
+        )
+      })}
     </div>
   )
 }
