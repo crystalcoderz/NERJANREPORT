@@ -28,10 +28,10 @@ export default function Page() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-              NL
+              JR
             </span>
             <div>
-              <p className="text-sm font-bold leading-tight text-foreground">NER LogiSense</p>
+              <p className="text-sm font-bold leading-tight text-foreground">Jan Report</p>
               <p className="text-[11px] leading-tight text-muted-foreground">Logistics Intelligence</p>
             </div>
           </div>
