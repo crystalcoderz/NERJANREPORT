@@ -5,7 +5,7 @@ export function TopBar() {
     <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Good Morning, Arjun
+          Good Morning, Prayaas
         </h1>
         <p className="text-sm text-muted-foreground">
           Here&apos;s the latest on the North Eastern Region logistics network.
