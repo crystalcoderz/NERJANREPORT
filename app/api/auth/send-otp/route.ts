@@ -2,6 +2,9 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { sendOtpEmail } from "@/lib/resend"
 import { NextResponse } from "next/server"
 
+export const runtime = "nodejs"
+export const maxDuration = 30
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const RESEND_COOLDOWN_MS = 30_000
 const CODE_TTL_MS = 10 * 60 * 1000
