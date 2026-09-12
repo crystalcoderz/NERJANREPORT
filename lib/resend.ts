@@ -13,6 +13,7 @@ export async function sendOtpEmail(email: string, code: string) {
       to: [email],
       subject: `${code} is your Jan Report sign-in code`,
       html: otpEmailHtml(code),
+      text: otpEmailText(code),
     }),
   })
 
@@ -22,6 +23,10 @@ export async function sendOtpEmail(email: string, code: string) {
   }
 
   return response.json() as Promise<{ id: string }>
+}
+
+function otpEmailText(code: string) {
+  return `Your Jan Report sign-in code is ${code}. It expires in 10 minutes. If you didn't request this code, you can safely ignore this email.`
 }
 
 function otpEmailHtml(code: string) {
