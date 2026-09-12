@@ -19,8 +19,14 @@ function getTimeOfDayGreeting() {
   return "Good Evening"
 }
 
-export function TopBar({ userEmail }: { userEmail?: string | null }) {
-  const name = getGreetingName(userEmail)
+export function TopBar({
+  userEmail,
+  displayName,
+}: {
+  userEmail?: string | null
+  displayName?: string | null
+}) {
+  const name = displayName?.trim() || getGreetingName(userEmail)
   const initial = name.charAt(0).toUpperCase()
 
   return (
