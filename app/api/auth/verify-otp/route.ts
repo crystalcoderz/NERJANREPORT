@@ -2,6 +2,9 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse } from "next/server"
 
+export const runtime = "nodejs"
+export const maxDuration = 30
+
 const MAX_ATTEMPTS = 5
 
 export async function POST(request: Request) {
