@@ -1,11 +1,32 @@
 import { Bell, Search, ChevronDown } from "lucide-react"
 
-export function TopBar() {
+function getGreetingName(email: string | null | undefined) {
+  if (!email) return "there"
+  const localPart = email.split("@")[0]
+  const cleaned = localPart.replace(/[._-]+/g, " ").trim()
+  if (!cleaned) return "there"
+  return cleaned
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+function getTimeOfDayGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Good Morning"
+  if (hour < 17) return "Good Afternoon"
+  return "Good Evening"
+}
+
+export function TopBar({ userEmail }: { userEmail?: string | null }) {
+  const name = getGreetingName(userEmail)
+  const initial = name.charAt(0).toUpperCase()
+
   return (
     <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Good Morning, Prayaas
+          {getTimeOfDayGreeting()}, {name}
         </h1>
         <p className="text-sm text-muted-foreground">
           Here&apos;s the latest on the North Eastern Region logistics network.
@@ -33,11 +54,11 @@ export function TopBar() {
 
         <div className="flex items-center gap-2 rounded-lg border border-border bg-card py-1.5 pl-1.5 pr-2.5">
           <span className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-            A
+            {initial}
           </span>
           <div className="hidden text-left sm:block">
-            <p className="text-sm font-medium leading-tight text-foreground">Arjun Barua</p>
-            <p className="text-xs leading-tight text-muted-foreground">Regional Officer</p>
+            <p className="text-sm font-medium leading-tight text-foreground">{name}</p>
+            <p className="text-xs leading-tight text-muted-foreground">{userEmail ?? "Signed in"}</p>
           </div>
           <ChevronDown className="size-4 text-muted-foreground" />
         </div>
