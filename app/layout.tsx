@@ -10,7 +10,6 @@ export const metadata: Metadata = {
   title: 'Jan Report — AI Logistics & Accessibility Intelligence',
   description:
     'AI-powered smart logistics and accessibility intelligence platform for the North Eastern Region: real-time route risk, GPS tracking, weather alerts, and field reporting.',
-  generator: 'v0.app',
 }
 
 export const viewport: Viewport = {

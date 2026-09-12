@@ -28,27 +28,20 @@ export default async function Page() {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("full_name").eq("user_id", user.id).maybeSingle()
+    : { data: null }
+
   return (
     <main className="min-h-screen bg-background">
       <IncidentMonitor />
       <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-              JR
-            </span>
-            <div>
-              <p className="text-sm font-bold leading-tight text-foreground">Jan Report</p>
-              <p className="text-[11px] leading-tight text-muted-foreground">Logistics Intelligence</p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <p className="text-xs font-medium text-muted-foreground">{dateLabel}</p>
-            <UserMenu email={user?.email ?? null} />
-          </div>
+        <div className="flex items-center justify-end gap-3">
+          <p className="text-xs font-medium text-muted-foreground">{dateLabel}</p>
+          <UserMenu email={user?.email ?? null} />
         </div>
 
-        <TopBar userEmail={user?.email ?? null} />
+        <TopBar userEmail={user?.email ?? null} displayName={profile?.full_name ?? null} />
 
         <RouteProvider>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
