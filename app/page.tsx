@@ -26,18 +26,16 @@ export default function Page() {
       <IncidentMonitor />
       <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-sm bg-primary font-mono text-xs font-bold text-primary-foreground">
-              JR
+          <div className="flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+              NL
             </span>
             <div>
-              <p className="text-sm font-semibold leading-tight tracking-tight text-foreground">Jan Report</p>
-              <p className="font-mono text-[10px] uppercase leading-tight tracking-[0.14em] text-muted-foreground">
-                Logistics Intelligence
-              </p>
+              <p className="text-sm font-bold leading-tight text-foreground">NER LogiSense</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">Logistics Intelligence</p>
             </div>
           </div>
-          <p className="shrink-0 font-mono text-xs text-muted-foreground">{dateLabel}</p>
+          <p className="shrink-0 text-xs font-medium text-muted-foreground">{dateLabel}</p>
         </div>
 
         <TopBar />
