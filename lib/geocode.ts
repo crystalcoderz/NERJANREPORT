@@ -18,7 +18,7 @@ export async function geocodeCity(name: string): Promise<GeocodedPlace | null> {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
       `${trimmed}, Northeast India`,
     )}&key=${apiKey}`
-    const res = await fetch(url, { cache: "no-store" })
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(5000) })
     if (!res.ok) return null
     const data = await res.json()
     const result = data.results?.[0]

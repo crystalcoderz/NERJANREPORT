@@ -25,7 +25,7 @@ export type TripDetails = z.infer<typeof extractionSchema>
 function buildPrompt(message: string, known: Partial<TripDetails>, nowIso: string) {
   return `You are helping extract freight trip details from a WhatsApp message sent by a driver in Northeast India.
 
-Current date and time (ISO): ${nowIso}
+Current date and time (ISO): ${nowIso}. Interpret all driver times in Asia/Kolkata (UTC+05:30), and include the timezone offset in the result.
 
 Known cities in the region — use these exact names when the message matches one: ${Object.keys(cities).join(", ")}
 
@@ -64,11 +64,15 @@ export async function extractTripDetails(
   message: string,
   known: Partial<TripDetails>,
 ): Promise<{ details: TripDetails | null; provider: string }> {
+  const city = Object.keys(cities).find((name) => name.toLowerCase() === message.trim().toLowerCase())
+  if (city && (!known.origin || !known.destination)) {
+    return { details: { origin: !known.origin ? city : null, destination: known.origin ? city : null, mode: null, departureTimeIso: null }, provider: "local" }
+  }
   const nowIso = new Date().toISOString()
   const prompt = buildPrompt(message, known, nowIso)
 
   try {
-    const { text } = await generateText({ model: moonshot(KIMI_MODEL), prompt })
+    const { text } = await generateText({ model: moonshot(KIMI_MODEL), prompt, maxRetries: 0, abortSignal: AbortSignal.timeout(6000) })
     const parsed = parseJson(text)
     if (parsed) return { details: parsed, provider: "Kimi" }
     console.log("[v0] Kimi returned unparseable JSON, falling back to Gemini")
@@ -77,7 +81,7 @@ export async function extractTripDetails(
   }
 
   try {
-    const { text } = await generateText({ model: GEMINI_MODEL, prompt, temperature: 0.2 })
+    const { text } = await generateText({ model: GEMINI_MODEL, prompt, temperature: 0.2, maxRetries: 0, abortSignal: AbortSignal.timeout(6000) })
     const parsed = parseJson(text)
     if (parsed) return { details: parsed, provider: "Gemini (fallback)" }
   } catch (err) {
