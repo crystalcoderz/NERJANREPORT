@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import { withGemini } from "@/lib/ai-gemini"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 45
+export const maxDuration = 60
 
 const KIMI_MODEL = "kimi-k3"
 
@@ -202,22 +202,27 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await withGemini((model) =>
-      generateText({ model, prompt, temperature: 0.4, maxRetries: 0 }),
-    )
+    const result = await generateText({
+      model: moonshot(KIMI_MODEL),
+      prompt,
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(30000),
+    })
     const brief = parseBrief(result.text)
     if (!brief) throw new Error("unparseable brief")
-    const sources = extractSources(result)
-    return NextResponse.json({ ...base, brief, sources, grounded: sources.length > 0 })
-  } catch (geminiError) {
-    console.log("[v0] location-brief Gemini failed, trying Kimi:", (geminiError as Error).message)
+    return NextResponse.json({ ...base, brief, sources: [], grounded: false })
+  } catch (kimiError) {
+    console.log("[v0] location-brief Kimi failed, trying Gemini:", (kimiError as Error).message)
     try {
-      const result = await generateText({ model: moonshot(KIMI_MODEL), prompt })
+      const result = await withGemini((model) =>
+        generateText({ model, prompt, temperature: 0.4, maxRetries: 0 }),
+      )
       const brief = parseBrief(result.text)
       if (!brief) throw new Error("unparseable brief")
-      return NextResponse.json({ ...base, brief, sources: [], grounded: false })
-    } catch (kimiError) {
-      console.log("[v0] location-brief Kimi failed:", (kimiError as Error).message)
+      const sources = extractSources(result)
+      return NextResponse.json({ ...base, brief, sources, grounded: sources.length > 0 })
+    } catch (geminiError) {
+      console.log("[v0] location-brief Gemini failed:", (geminiError as Error).message)
       return NextResponse.json({
         ...base,
         grounded: false,

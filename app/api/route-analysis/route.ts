@@ -49,21 +49,25 @@ export async function POST(request: Request) {
   const prompt = buildPrompt(body)
 
   try {
-    const { text } = await withGemini((model) =>
-      generateText({ model, prompt, temperature: 0.4, maxRetries: 0 }),
-    )
-    return NextResponse.json({ provider: "Gemini", model: GEMINI_MODEL, analysis: text.trim() })
-  } catch (geminiError) {
-    console.log("[v0] Gemini failed, falling back to Kimi:", (geminiError as Error).message)
+    // Kimi only accepts the default temperature (1); passing any other value errors out.
+    const { text } = await generateText({
+      model: moonshot(KIMI_MODEL),
+      prompt,
+      maxRetries: 0,
+      // Kimi writes better copy but can stall well past the function's maxDuration.
+      // Cutting it off early leaves room for the Gemini fallback to still answer.
+      abortSignal: AbortSignal.timeout(18000),
+    })
+    return NextResponse.json({ provider: "Kimi", model: KIMI_MODEL, analysis: text.trim() })
+  } catch (kimiError) {
+    console.log("[v0] Kimi failed, falling back to Gemini:", (kimiError as Error).message)
     try {
-      // Kimi only accepts the default temperature (1); passing any other value errors out.
-      const { text } = await generateText({
-        model: moonshot(KIMI_MODEL),
-        prompt,
-      })
-      return NextResponse.json({ provider: "Kimi (fallback)", model: KIMI_MODEL, analysis: text.trim() })
-    } catch (kimiError) {
-      console.log("[v0] Kimi also failed:", (kimiError as Error).message)
+      const { text } = await withGemini((model) =>
+        generateText({ model, prompt, temperature: 0.4, maxRetries: 0 }),
+      )
+      return NextResponse.json({ provider: "Gemini (fallback)", model: GEMINI_MODEL, analysis: text.trim() })
+    } catch (geminiError) {
+      console.log("[v0] Gemini also failed:", (geminiError as Error).message)
       return NextResponse.json(
         {
           provider: "Offline",

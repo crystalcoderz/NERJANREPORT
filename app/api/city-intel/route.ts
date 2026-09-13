@@ -5,7 +5,7 @@ import { nerCities } from "@/lib/data"
 import { withGemini, GEMINI_MODEL_LABEL as GEMINI_MODEL } from "@/lib/ai-gemini"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 30
+export const maxDuration = 60
 
 const KIMI_MODEL = "kimi-k3"
 
@@ -158,20 +158,28 @@ export async function GET(request: Request) {
   try {
     return await withModel(
       async () =>
-        (await withGemini((model) => generateText({ model, prompt, temperature: 0.4, maxRetries: 0 }))).text,
-      "Gemini",
-      GEMINI_MODEL,
+        (
+          await generateText({
+            model: moonshot(KIMI_MODEL),
+            prompt,
+            maxRetries: 0,
+            abortSignal: AbortSignal.timeout(30000),
+          })
+        ).text,
+      "Kimi",
+      KIMI_MODEL,
     )
-  } catch (geminiError) {
-    console.log("[v0] city-intel Gemini failed, trying Kimi:", (geminiError as Error).message)
+  } catch (kimiError) {
+    console.log("[v0] city-intel Kimi failed, trying Gemini:", (kimiError as Error).message)
     try {
       return await withModel(
-        async () => (await generateText({ model: moonshot(KIMI_MODEL), prompt })).text,
-        "Kimi (fallback)",
-        KIMI_MODEL,
+        async () =>
+          (await withGemini((model) => generateText({ model, prompt, temperature: 0.4, maxRetries: 0 }))).text,
+        "Gemini (fallback)",
+        GEMINI_MODEL,
       )
-    } catch (kimiError) {
-      console.log("[v0] city-intel Kimi failed:", (kimiError as Error).message)
+    } catch (geminiError) {
+      console.log("[v0] city-intel Gemini failed:", (geminiError as Error).message)
       return NextResponse.json({
         ...base,
         provider: "Offline",

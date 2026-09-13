@@ -7,7 +7,7 @@ import { cities } from "@/lib/data"
 import { withGemini, GEMINI_MODEL_LABEL as GEMINI_MODEL } from "@/lib/ai-gemini"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 30
+export const maxDuration = 60
 
 const KIMI_MODEL = "kimi-k3"
 
@@ -124,30 +124,32 @@ export async function POST() {
 
   const prompt = buildPrompt(weather as any, reports)
 
-  let provider = "Gemini"
-  let model = GEMINI_MODEL
+  let provider = "Kimi"
+  let model = KIMI_MODEL
   let result: { object: z.infer<typeof incidentSchema> } | null = null
 
   try {
-    result = await withGemini((model) =>
-      generateObject({ model, schema: incidentSchema, prompt, temperature: 0.3, maxRetries: 0 }),
-    )
-  } catch (geminiError) {
-    console.log("[v0] Gemini incident generation failed, falling back to Kimi:", (geminiError as Error).message)
+    // Moonshot doesn't support structured-output mode, and only accepts the default
+    // temperature (1) — so ask for plain JSON via generateText and parse it manually.
+    const { text } = await generateText({
+      model: moonshot(KIMI_MODEL),
+      prompt: buildJsonPrompt(prompt),
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(30000),
+    })
+    const parsed = parseIncidentJson(text)
+    if (!parsed) throw new Error("Kimi returned unparseable JSON")
+    result = { object: parsed }
+  } catch (kimiError) {
+    console.log("[v0] Kimi incident generation failed, falling back to Gemini:", (kimiError as Error).message)
     try {
-      provider = "Kimi (fallback)"
-      model = KIMI_MODEL
-      // Moonshot doesn't support structured-output mode, and only accepts the default
-      // temperature (1) — so ask for plain JSON via generateText and parse it manually.
-      const { text } = await generateText({ model: moonshot(KIMI_MODEL), prompt: buildJsonPrompt(prompt) })
-      const parsed = parseIncidentJson(text)
-      if (!parsed) {
-        console.log("[v0] Kimi incident generation returned unparseable JSON")
-        return NextResponse.json({ ok: false, provider: "Offline", generated: 0 }, { status: 200 })
-      }
-      result = { object: parsed }
-    } catch (kimiError) {
-      console.log("[v0] Kimi incident generation also failed:", (kimiError as Error).message)
+      provider = "Gemini (fallback)"
+      model = GEMINI_MODEL
+      result = await withGemini((geminiModel) =>
+        generateObject({ model: geminiModel, schema: incidentSchema, prompt, temperature: 0.3, maxRetries: 0 }),
+      )
+    } catch (geminiError) {
+      console.log("[v0] Gemini incident generation also failed:", (geminiError as Error).message)
       return NextResponse.json({ ok: false, provider: "Offline", generated: 0 }, { status: 200 })
     }
   }
