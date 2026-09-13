@@ -441,7 +441,7 @@ function RouteInputs() {
       : null
 
   return (
-    <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className="pointer-events-auto flex flex-1 items-center gap-2 rounded-lg border border-border bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
           <MapPin className="size-4 shrink-0 text-risk-low" />
@@ -607,7 +607,7 @@ function ClimateControl({
   source?: string
 }) {
   return (
-    <div className="absolute right-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-col gap-1.5 rounded-lg border border-border bg-card/95 p-2 shadow-sm backdrop-blur">
+    <div className="pointer-events-auto flex max-w-full flex-col gap-1.5 self-start rounded-lg border border-border bg-card/95 p-2 shadow-sm backdrop-blur sm:self-end">
       <div className="flex items-center justify-between gap-2 px-1">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Climate Layer</span>
         {source === "open-meteo" && (
@@ -703,7 +703,6 @@ export function RouteMap() {
 
   return (
     <div className="relative min-h-[560px] w-full overflow-hidden rounded-lg border border-border bg-card shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] lg:min-h-[640px]">
-      <RouteInputs />
       {mounted && KEY ? (
         <APIProvider apiKey={KEY}>
           <Map
@@ -724,9 +723,12 @@ export function RouteMap() {
       ) : (
         <MissingKey />
       )}
-      {mounted && KEY && (
-        <ClimateControl metric={metric} setMetric={setMetric} source={climateData?.source} />
-      )}
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-col gap-2">
+        <RouteInputs />
+        {mounted && KEY && (
+          <ClimateControl metric={metric} setMetric={setMetric} source={climateData?.source} />
+        )}
+      </div>
       {mounted && KEY && selectedCity && (
         <CityIntelCard city={selectedCity} onClose={() => setSelectedCity(null)} />
       )}
