@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Search, Settings, Satellite } from "lucide-react"
+import { Search, Settings, Satellite, Globe2 } from "lucide-react"
 import { UserMenu } from "./user-menu"
 import { NotificationBell } from "./notification-bell"
 
@@ -55,6 +55,15 @@ export function TopBar({
         </div>
 
         <NotificationBell />
+
+        <Link
+          href="/network"
+          aria-label="Open National Risk Grid"
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Globe2 className="size-4" />
+          <span className="hidden sm:inline">National Grid</span>
+        </Link>
 
         <Link
           href="/satellite"
