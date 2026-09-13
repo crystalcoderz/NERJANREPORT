@@ -547,7 +547,7 @@ function RouteInputs() {
   )
 }
 
-function Legend({ source, generatedBy }: { source?: string; generatedBy?: string | null }) {
+function Legend({ source }: { source?: string }) {
   const rows = [
     { c: "bg-risk-low", t: "Low Risk" },
     { c: "bg-risk-moderate", t: "Moderate Risk" },
@@ -566,7 +566,7 @@ function Legend({ source, generatedBy }: { source?: string; generatedBy?: string
       </ul>
       {source === "ai" && (
         <p className="mt-2 flex items-center gap-1 border-t border-border pt-2 text-[10px] font-medium text-info">
-          <Sparkles className="size-3" /> Live incidents{generatedBy ? ` · ${generatedBy}` : ""}
+          <Sparkles className="size-3" /> Live incidents
         </p>
       )}
     </div>
@@ -699,7 +699,6 @@ export function RouteMap() {
     refreshInterval: 300000,
   })
   const liveIncidents = incidentsData?.incidents ?? []
-  const generatedBy = liveIncidents.find((i) => i.model)?.model ?? null
   const climateCells = climateData?.cells ?? []
 
   return (
@@ -732,7 +731,7 @@ export function RouteMap() {
         <CityIntelCard city={selectedCity} onClose={() => setSelectedCity(null)} />
       )}
       {mounted && KEY && metric !== "off" && <ClimateScale metric={metric} />}
-      <Legend source={incidentsData?.source} generatedBy={generatedBy} />
+              <Legend source={incidentsData?.source} />
     </div>
   )
 }

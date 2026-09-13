@@ -85,7 +85,7 @@ export function RecommendedRoute() {
         if (runId === runIdRef.current) setData(json)
       })
       .catch(() => {
-        if (runId === runIdRef.current) setData({ provider: "Offline", analysis: "Unable to reach the AI service right now." })
+        if (runId === runIdRef.current) setData({ provider: "Offline", analysis: "Unable to reach the analysis service right now." })
       })
       .finally(() => {
         if (runId === runIdRef.current) setLoading(false)
@@ -109,7 +109,7 @@ export function RecommendedRoute() {
     })
       .then((r) => r.json())
       .then((json) => runId === runIdRef.current && setData(json))
-      .catch(() => runId === runIdRef.current && setData({ provider: "Offline", analysis: "Unable to reach the AI service right now." }))
+      .catch(() => runId === runIdRef.current && setData({ provider: "Offline", analysis: "Unable to reach the analysis service right now." }))
       .finally(() => runId === runIdRef.current && setLoading(false))
   }
 
@@ -164,7 +164,7 @@ export function RecommendedRoute() {
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-info">
             <Sparkles className="size-3.5" />
-            AI Risk Analysis
+            Risk Analysis
           </span>
           <button
             type="button"
