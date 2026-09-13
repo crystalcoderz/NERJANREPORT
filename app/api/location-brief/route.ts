@@ -2,6 +2,7 @@ import { generateText } from "ai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { NextResponse } from "next/server"
 import { withGemini, KIMI_MODEL } from "@/lib/ai-gemini"
+import { resolvePlace } from "@/lib/geocode"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -64,32 +65,20 @@ function kindFromCode(code: number | null | undefined): WeatherKind {
   return "cloudy"
 }
 
-async function geocodeOnce(query: string, countryCode?: string): Promise<GeoResult | null> {
-  const params = new URLSearchParams({ name: query, count: "1", language: "en", format: "json" })
-  if (countryCode) params.set("countryCode", countryCode)
-  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`, { cache: "no-store" })
-  if (!res.ok) throw new Error(`geocoding ${res.status}`)
-  const json = await res.json()
-  const first = json?.results?.[0]
-  if (!first) return null
-  return {
-    name: first.name,
-    admin1: first.admin1 || null,
-    country: first.country ?? null,
-    lat: first.latitude,
-    lng: first.longitude,
-  }
-}
-
+/**
+ * Google Places covers every Indian city, town and landmark and tolerates typos,
+ * unlike the strict global geocoder used previously — which matched "Tawang" to
+ * a village in Indonesia and rejected slight misspellings outright.
+ */
 async function geocode(query: string): Promise<GeoResult | null> {
-  try {
-    // Resolve Indian places first: this is a Northeast India logistics platform, and a bare
-    // "Tawang" otherwise matches villages in Indonesia and the Philippines instead of Arunachal.
-    // Non-Indian queries find nothing under the IN filter and fall through to a global lookup.
-    return (await geocodeOnce(query, "IN")) ?? (await geocodeOnce(query))
-  } catch (err) {
-    console.log("[v0] location-brief geocode failed:", (err as Error).message)
-    return null
+  const place = await resolvePlace(query)
+  if (!place) return null
+  return {
+    name: place.label,
+    admin1: place.state ?? null,
+    country: place.country ?? "India",
+    lat: place.lat,
+    lng: place.lng,
   }
 }
 

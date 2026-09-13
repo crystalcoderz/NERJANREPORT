@@ -90,10 +90,11 @@ type BriefResponse = {
 const SUGGESTIONS: { label: string; query: string }[] = [
   { label: "Guwahati", query: "Guwahati" },
   { label: "Tawang", query: "Tawang" },
-  { label: "Kaziranga", query: "Kaziranga" },
-  // The gazetteer has no feature called "Siliguri Corridor", so search the city it is named for.
+  // Places has no feature named "Siliguri Corridor", so search the city it is named for.
   { label: "Siliguri Corridor", query: "Siliguri" },
-  { label: "Imphal", query: "Imphal" },
+  { label: "Lucknow", query: "Lucknow" },
+  { label: "Nagpur", query: "Nagpur" },
+  { label: "Mundra Port", query: "Mundra Port" },
 ]
 
 export function LocationBriefing() {
@@ -141,7 +142,7 @@ export function LocationBriefing() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               type="text"
-              placeholder="Choose any city or location…"
+              placeholder="Search any city, town or landmark in India…"
               className="h-10 w-full rounded-lg border border-border bg-secondary/40 pl-9 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/40"
             />
           </div>
