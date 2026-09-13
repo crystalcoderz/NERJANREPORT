@@ -1,6 +1,6 @@
 import { OpsTicker } from "@/components/dashboard/ops-ticker"
 import { TopBar } from "@/components/dashboard/top-bar"
-import { StatCards } from "@/components/dashboard/stat-cards"
+import { LocationBriefing } from "@/components/dashboard/location-briefing"
 import { RouteMap } from "@/components/dashboard/route-map"
 import { WeatherPanel } from "@/components/dashboard/weather-panel"
 import { EnvironmentalPanel } from "@/components/dashboard/environmental-panel"
@@ -35,7 +35,7 @@ export default async function Page() {
         <RouteProvider>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <div className="flex flex-col gap-5 lg:col-span-2">
-              <StatCards />
+              <LocationBriefing />
               <RouteMap />
             </div>
             <div className="flex flex-col gap-5">
