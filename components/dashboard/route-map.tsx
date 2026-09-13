@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import useSWR from "swr"
 import { APIProvider, Map, useMap, useMapsLibrary } from "@vis.gl/react-google-maps"
 import { MapPin, Navigation, ArrowLeftRight, KeyRound, Loader2, Waypoints, X, Sparkles } from "lucide-react"
-import { cities, type LatLng } from "@/lib/data"
+import { cities, nerCities, type LatLng } from "@/lib/data"
 import type { LiveIncident } from "@/app/api/incidents/route"
 import { deriveRisk, estimateRoute, formatEta, riskRank, useRoute, type RouteOption } from "./route-context"
+import { CityIntelCard } from "./city-intel-card"
 
 const incidentsFetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -66,6 +67,43 @@ function pin(color: string, glyph: "start" | "end" | "dot") {
     scaledSize: new google.maps.Size(30, 42),
     anchor: new google.maps.Point(15, 42),
   } as google.maps.Icon
+}
+
+function cityPin(active: boolean): google.maps.Icon {
+  const fill = active ? "#e0b94f" : "#c9a95c"
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+    <circle cx="11" cy="11" r="9" fill="${fill}" fill-opacity="0.18" stroke="${fill}" stroke-width="1"/>
+    <path d="M11 5l1.6 3.4 3.4.4-2.5 2.4.6 3.4L11 13.4 7.9 15l.6-3.4L6 9.2l3.4-.4z" fill="${fill}"/>
+  </svg>`
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(22, 22),
+    anchor: new google.maps.Point(11, 11),
+  } as google.maps.Icon
+}
+
+function CityLayer({ onSelect, selected }: { onSelect: (city: string) => void; selected: string | null }) {
+  const map = useMap()
+  const markerLib = useMapsLibrary("marker")
+
+  useEffect(() => {
+    if (!map || !markerLib) return
+    const markers: google.maps.Marker[] = []
+    nerCities.forEach((c) => {
+      const m = new markerLib.Marker({
+        position: c.coords,
+        map,
+        icon: cityPin(c.name === selected),
+        title: `${c.name}, ${c.state} — click for live intel`,
+        zIndex: c.name === selected ? 8 : 3,
+      })
+      m.addListener("click", () => onSelect(c.name))
+      markers.push(m)
+    })
+    return () => markers.forEach((m) => m.setMap(null))
+  }, [map, markerLib, onSelect, selected])
+
+  return null
 }
 
 function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
@@ -441,6 +479,8 @@ function MissingKey() {
 
 export function RouteMap() {
   const [mounted, setMounted] = useState(false)
+  const [selectedCity, setSelectedCity] = useState<string | null>(null)
+  const handleSelectCity = useCallback((city: string) => setSelectedCity(city), [])
   useEffect(() => setMounted(true), [])
 
   const { data: incidentsData } = useSWR<{ source: string; incidents: LiveIncident[] }>(
@@ -467,10 +507,14 @@ export function RouteMap() {
             style={{ width: "100%", height: "100%" }}
           >
             <RouteLayer incidents={liveIncidents} />
+            <CityLayer onSelect={handleSelectCity} selected={selectedCity} />
           </Map>
         </APIProvider>
       ) : (
         <MissingKey />
+      )}
+      {mounted && KEY && selectedCity && (
+        <CityIntelCard city={selectedCity} onClose={() => setSelectedCity(null)} />
       )}
       <Legend source={incidentsData?.source} generatedBy={generatedBy} />
     </div>
