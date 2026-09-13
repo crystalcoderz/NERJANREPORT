@@ -4,6 +4,7 @@
   "private": true,
   "packageManager": "pnpm@12.3.4",
   "scripts": {
+    "test:whatsapp": "node --test tests/whatsapp-flow.cjs tests/whatsapp-map.cjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start"

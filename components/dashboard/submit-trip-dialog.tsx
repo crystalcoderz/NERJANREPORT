@@ -134,7 +134,7 @@ export function SubmitTripDialog({
               <UserRound className="size-3.5" />
               Assign to
             </Label>
-            <Select value={driverId} onValueChange={setDriverId}>
+            <Select value={driverId} onValueChange={(value) => setDriverId(value ?? "")}>
               <SelectTrigger id="driver" className="w-full">
                 <SelectValue placeholder="Select a driver" />
               </SelectTrigger>
