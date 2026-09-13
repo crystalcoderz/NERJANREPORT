@@ -165,7 +165,6 @@ export function RecommendedRoute() {
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-info">
             <Sparkles className="size-3.5" />
             AI Risk Analysis
-            {data && <span className="font-normal text-muted-foreground">· {data.provider}</span>}
           </span>
           <button
             type="button"
