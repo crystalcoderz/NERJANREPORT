@@ -283,7 +283,7 @@ async function continueCollecting(
 
   // Both model providers failing must not dead-end the conversation: a bare place
   // reply can still be resolved locally for whichever slot we are waiting on.
-  const resolved = details ?? localSlotGuess(text, known)
+  const resolved = details ?? (await localSlotGuess(text, known))
   if (!resolved) {
     await sendWhatsAppText(from, "I couldn't process that right now — please try rephrasing your message.")
     return

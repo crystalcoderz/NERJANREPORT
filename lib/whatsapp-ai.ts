@@ -2,6 +2,7 @@ import { generateText } from "ai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { z } from "zod"
 import { cities } from "@/lib/data"
+import { geocodeCity } from "@/lib/geocode"
 import { withGemini, KIMI_MODEL } from "@/lib/ai-gemini"
 
 const moonshot = createOpenAICompatible({
@@ -20,7 +21,7 @@ const extractionSchema = z.object({
 export type TripDetails = z.infer<typeof extractionSchema>
 
 function buildPrompt(message: string, known: Partial<TripDetails>, nowIso: string) {
-  return `You are helping extract freight trip details from a WhatsApp message sent by a driver in Northeast India.
+  return `You are helping extract freight trip details from a WhatsApp message sent by a freight driver in India. Trips run anywhere in the country, not just one region.
 
 Current date and time (ISO): ${nowIso}. Interpret all driver times in Asia/Kolkata (UTC+05:30), and include the timezone offset in the result.
 
@@ -65,11 +66,10 @@ const NOISE = new Set([
 ])
 
 /**
- * Resolves a bare place reply such as "Jhansi" or "to lucknow" without calling a model.
- * The extraction prompt is anchored on Northeast India, so cities elsewhere in the
- * country came back null and permanently stalled the slot they were meant to fill.
+ * Works out which slot a short reply answers, and what place name it contains.
+ * Returns the raw candidate — Google decides whether it is a real place.
  */
-export function localSlotGuess(message: string, known: Partial<TripDetails>): TripDetails | null {
+function readSlot(message: string, known: Partial<TripDetails>): { slot: "origin" | "destination"; value: string } | null {
   const raw = (message ?? "").trim().replace(/[.!,]+$/, "")
   if (!raw || TIME_WORDS.test(raw)) return null
 
@@ -86,12 +86,27 @@ export function localSlotGuess(message: string, known: Partial<TripDetails>): Tr
   if (!slot) return null
   if (!explicit && (slot === "origin" ? known.origin : known.destination)) return null
 
-  const canonical = Object.keys(cities).find((c) => c.toLowerCase() === value.toLowerCase())
-  const place = canonical ?? value.replace(/\b\w/g, (m) => m.toUpperCase())
+  return { slot, value }
+}
+
+/**
+ * Resolves a bare place reply such as "Jhansi" or "to lucknow" without calling a model,
+ * confirming the place against Google Geocoding so any Indian city is accepted and
+ * non-places are rejected. Returns the canonical Google spelling.
+ */
+export async function localSlotGuess(
+  message: string,
+  known: Partial<TripDetails>,
+): Promise<TripDetails | null> {
+  const read = readSlot(message, known)
+  if (!read) return null
+
+  const place = await geocodeCity(read.value)
+  if (!place) return null
 
   return {
-    origin: slot === "origin" ? place : null,
-    destination: slot === "destination" ? place : null,
+    origin: read.slot === "origin" ? place.label : null,
+    destination: read.slot === "destination" ? place.label : null,
     mode: null,
     departureTimeIso: null,
   }
@@ -103,8 +118,8 @@ export async function extractTripDetails(
   message: string,
   known: Partial<TripDetails>,
 ): Promise<{ details: TripDetails | null; provider: string }> {
-  const local = localSlotGuess(message, known)
-  if (local) return { details: local, provider: "local" }
+  const local = await localSlotGuess(message, known)
+  if (local) return { details: local, provider: "google" }
 
   const nowIso = new Date().toISOString()
   const prompt = buildPrompt(message, known, nowIso)
