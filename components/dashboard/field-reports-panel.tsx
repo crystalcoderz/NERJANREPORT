@@ -116,11 +116,9 @@ export function FieldReportsPanel() {
         count={activeCount}
         action={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-8 gap-1.5 text-xs">
-                <Plus className="size-3.5" />
-                New Report
-              </Button>
+            <DialogTrigger render={<Button size="sm" className="h-8 gap-1.5 text-xs" />}>
+              <Plus className="size-3.5" />
+              New Report
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
