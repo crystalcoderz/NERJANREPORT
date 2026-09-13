@@ -1,6 +1,7 @@
 import Link from "next/link"
-import { Bell, Search, Settings, Satellite } from "lucide-react"
+import { Search, Settings, Satellite } from "lucide-react"
 import { UserMenu } from "./user-menu"
+import { NotificationBell } from "./notification-bell"
 
 function getGreetingName(email: string | null | undefined) {
   if (!email) return "there"
@@ -53,14 +54,7 @@ export function TopBar({
           />
         </div>
 
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative flex size-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Bell className="size-5" />
-          <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-risk-high ring-2 ring-card" />
-        </button>
+        <NotificationBell />
 
         <Link
           href="/satellite"
