@@ -6,7 +6,7 @@ import { NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
 export const maxDuration = 45
 
-const GEMINI_MODEL = "gemini-3.6-flash"
+const GEMINI_MODEL = "gemini-flash-latest"
 const KIMI_MODEL = "kimi-k3"
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
