@@ -3,6 +3,7 @@ import { TopBar } from "@/components/dashboard/top-bar"
 import { StatCards } from "@/components/dashboard/stat-cards"
 import { RouteMap } from "@/components/dashboard/route-map"
 import { WeatherPanel } from "@/components/dashboard/weather-panel"
+import { EnvironmentalPanel } from "@/components/dashboard/environmental-panel"
 import { RecommendedRoute } from "@/components/dashboard/recommended-route"
 import { OtherRoutes } from "@/components/dashboard/other-routes"
 import { UpcomingShipments } from "@/components/dashboard/upcoming-shipments"
@@ -43,6 +44,7 @@ export default async function Page() {
               <OtherRoutes />
             </div>
           </div>
+          <EnvironmentalPanel />
         </RouteProvider>
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
