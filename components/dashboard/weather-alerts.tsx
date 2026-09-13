@@ -51,11 +51,11 @@ export function WeatherAlerts() {
           </span>
         }
       />
-      <ul className="flex flex-col">
+      <ul className="flex flex-col divide-y divide-border">
         {alerts.slice(0, 5).map((a) => {
           const Icon = kindIcons[a.kind]
           return (
-            <li key={a.id} className="flex items-center gap-3 border-t border-border px-4 py-3">
+            <li key={a.id} className="flex items-center gap-3 px-4 py-3">
               <span className={cn("flex size-9 items-center justify-center rounded-lg", levelStyles[a.level])}>
                 <Icon className="size-4.5" />
               </span>

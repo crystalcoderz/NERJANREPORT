@@ -27,9 +27,9 @@ export function OtherRoutes() {
           No alternative routes for this corridor.
         </p>
       ) : (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col divide-y divide-border">
           {alternatives.map((r) => (
-            <li key={r.index} className="border-t border-border">
+            <li key={r.index}>
               <button
                 type="button"
                 onClick={() => setSelectedIndex(r.index)}
