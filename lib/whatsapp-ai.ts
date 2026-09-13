@@ -5,7 +5,7 @@ import { z } from "zod"
 import { cities } from "@/lib/data"
 
 const KIMI_MODEL = "kimi-k3"
-const GEMINI_MODEL = "gemini-3.6-flash"
+const GEMINI_MODEL = "gemini-flash-latest"
 
 const moonshot = createOpenAICompatible({
   name: "moonshot",
