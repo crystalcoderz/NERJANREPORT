@@ -230,7 +230,7 @@ export function FieldReportsPanel() {
             return (
               <div
                 key={report.id}
-                className="flex flex-col gap-1.5 rounded-lg border border-border bg-background p-3"
+                className="flex flex-col gap-1.5 rounded-lg border border-border bg-secondary/60 p-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5">

@@ -2,7 +2,7 @@
 
 import useSWR from "swr"
 import { ArrowRight, Clock3, RefreshCw, TriangleAlert, UserRound } from "lucide-react"
-import { Panel } from "./panel"
+import { Panel, PanelHeader } from "./panel"
 import { RiskBadge } from "./risk-badge"
 import type { Trip } from "@/app/api/trips/route"
 
@@ -32,23 +32,25 @@ export function ActiveTripsPanel() {
   const trips = data?.trips ?? []
 
   return (
-    <Panel className="p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-card-foreground">Assigned Trips</h3>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">Auto-syncs every 10s</span>
-          <button
-            type="button"
-            onClick={() => mutate()}
-            aria-label="Refresh assigned trips"
-            className="text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <RefreshCw className="size-3.5" />
-          </button>
-        </div>
-      </div>
+    <Panel>
+      <PanelHeader
+        title="Assigned Trips"
+        action={
+          <div className="flex items-center gap-2">
+            <span className="hidden font-mono text-[10px] text-muted-foreground sm:inline">Syncs / 10s</span>
+            <button
+              type="button"
+              onClick={() => mutate()}
+              aria-label="Refresh assigned trips"
+              className="text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <RefreshCw className="size-3.5" />
+            </button>
+          </div>
+        }
+      />
 
-      <div className="mt-3 flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2.5 p-4">
         {isLoading && trips.length === 0 && (
           <p className="py-4 text-center text-xs text-muted-foreground">Loading assigned trips...</p>
         )}

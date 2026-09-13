@@ -13,9 +13,9 @@ export function NewsUpdates() {
           </button>
         }
       />
-      <ul className="flex flex-col">
+      <ul className="flex flex-col divide-y divide-border">
         {news.map((n) => (
-          <li key={n.id} className="flex items-start gap-3 border-t border-border px-4 py-3">
+          <li key={n.id} className="flex items-start gap-3 px-4 py-3">
             <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
               <Newspaper className="size-4" />
             </span>

@@ -14,16 +14,37 @@ const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const cityNames = Object.keys(cities)
 
 const incidentColors: Record<string, string> = {
-  info: "#2563eb",
-  moderate: "#d97706",
-  high: "#dc2626",
+  info: "#38bdf8",
+  moderate: "#fbbf24",
+  high: "#f87171",
 }
 
 const routeStrokes: Record<string, string> = {
-  low: "#16a34a",
-  moderate: "#d97706",
-  high: "#dc2626",
+  low: "#34d399",
+  moderate: "#fbbf24",
+  high: "#f87171",
 }
+
+// Console-style dark map theme so the map matches the ops dashboard chrome.
+const darkMapStyle: google.maps.MapTypeStyle[] = [
+  { elementType: "geometry", stylers: [{ color: "#1a1d23" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1d23" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8b93a3" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#3a3f4b" }] },
+  { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#8b93a3" }] },
+  { featureType: "administrative.land_parcel", stylers: [{ visibility: "off" }] },
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#20242c" }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2f3a" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1a1d23" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3a3f4b" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1a1d23" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#c9a95c" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#12151a" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4b5563" }] },
+]
 
 function pin(color: string, glyph: "start" | "end" | "dot") {
   if (glyph === "dot") {
@@ -159,7 +180,7 @@ function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
         path: r.path,
         map,
         geodesic: true,
-        strokeColor: isSel ? routeStrokes[r.risk] : "#94a3b8",
+        strokeColor: isSel ? routeStrokes[r.risk] : "#71717a",
         strokeOpacity: isSel ? 0.95 : 0.55,
         strokeWeight: isSel ? 5 : 4,
         zIndex: isSel ? 5 : 1,
@@ -174,7 +195,7 @@ function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
       new markerLib.Marker({
         position: sel.path[0],
         map,
-        icon: pin("#16a34a", "start"),
+        icon: pin("#34d399", "start"),
         title: `${originRef.current} (Origin)`,
         zIndex: 10,
       }),
@@ -183,7 +204,7 @@ function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
       new markerLib.Marker({
         position: sel.path[sel.path.length - 1],
         map,
-        icon: pin("#dc2626", "end"),
+        icon: pin("#f87171", "end"),
         title: `${destRef.current} (Destination)`,
         zIndex: 10,
       }),
@@ -197,7 +218,7 @@ function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
         new markerLib.Marker({
           position: pos,
           map,
-          icon: pin("#7c3aed", "dot"),
+          icon: pin("#a78bfa", "dot"),
           label: { text: String(idx + 1), color: "#ffffff", fontSize: "11px", fontWeight: "700" },
           title: `Stop ${idx + 1}: ${name}`,
           zIndex: 9,
@@ -431,7 +452,7 @@ export function RouteMap() {
   const generatedBy = liveIncidents.find((i) => i.model)?.model ?? null
 
   return (
-    <div className="relative min-h-[420px] w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <div className="relative min-h-[420px] w-full overflow-hidden rounded-lg border border-border bg-card shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
       <RouteInputs />
       {mounted && KEY ? (
         <APIProvider apiKey={KEY}>
@@ -441,6 +462,7 @@ export function RouteMap() {
             gestureHandling="greedy"
             disableDefaultUI
             zoomControl
+            styles={darkMapStyle}
             className="h-full min-h-[420px] w-full"
             style={{ width: "100%", height: "100%" }}
           >

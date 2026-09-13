@@ -115,7 +115,7 @@ export function StatCards() {
             <div className="mt-3 flex items-end justify-between">
               <div>
                 <p className="font-mono text-2xl font-bold leading-none text-foreground">{s.value}</p>
-                <p className="mt-1.5 text-xs text-muted-foreground">{s.label}</p>
+                <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{s.label}</p>
               </div>
               <span
                 className={cn(
