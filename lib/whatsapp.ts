@@ -6,19 +6,24 @@ const GRAPH_VERSION = "v21.0"
 // This only proves webhook ownership during setup — it is not a credential used at runtime.
 export const WHATSAPP_VERIFY_TOKEN = "jan_report_2026_verify"
 
+// Phone Number ID for +44 7344 643473 ("Jan Report Portal") on WABA 2113253752952717.
+// This is a public identifier rather than a secret, so it is pinned here: the
+// WHATSAPP_PHONE_NUMBER_ID project variable still holds the retired Meta test
+// number, and sending from that number never reaches real recipients.
+const PHONE_NUMBER_ID = "1303940209459464"
+
 function apiUrl(path: string) {
   return `https://graph.facebook.com/${GRAPH_VERSION}/${path}`
 }
 
 async function callGraph(body: Record<string, unknown>) {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
   const token = process.env.WHATSAPP_ACCESS_TOKEN
-  if (!phoneNumberId || !token) {
-    console.log("[v0] WhatsApp credentials missing, skipping send")
+  if (!token) {
+    console.log("[v0] WHATSAPP_ACCESS_TOKEN missing, skipping send")
     return null
   }
 
-  const res = await fetch(apiUrl(`${phoneNumberId}/messages`), {
+  const res = await fetch(apiUrl(`${PHONE_NUMBER_ID}/messages`), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

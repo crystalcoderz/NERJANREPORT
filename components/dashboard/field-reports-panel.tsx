@@ -116,11 +116,9 @@ export function FieldReportsPanel() {
         count={activeCount}
         action={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-8 gap-1.5 text-xs">
-                <Plus className="size-3.5" />
-                New Report
-              </Button>
+            <DialogTrigger render={<Button size="sm" className="h-8 gap-1.5 text-xs" />}>
+              <Plus className="size-3.5" />
+              New Report
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
@@ -203,10 +201,10 @@ export function FieldReportsPanel() {
         <Sparkles className="size-3 shrink-0 text-primary" />
         {latestSync ? (
           <span>
-            AI monitor synced {timeAgo(latestSync.created_at)} via {latestSync.model ?? "AI"}
+            Live monitor synced {timeAgo(latestSync.created_at)}
           </span>
         ) : (
-          <span>AI monitor warming up...</span>
+          <span>Live monitor warming up...</span>
         )}
       </div>
 
@@ -230,7 +228,7 @@ export function FieldReportsPanel() {
             return (
               <div
                 key={report.id}
-                className="flex flex-col gap-1.5 rounded-lg border border-border bg-background p-3"
+                className="flex flex-col gap-1.5 rounded-lg border border-border bg-secondary/60 p-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5">

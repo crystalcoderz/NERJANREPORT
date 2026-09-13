@@ -58,6 +58,33 @@ export const stats = [
   },
 ]
 
+// Major cities across the eight North Eastern Region states, used for the
+// interactive intel pinpoints on the map. Base facts are real approximate
+// figures (Census/geographic references); the AI briefing enriches them live.
+export type NerCity = {
+  name: string
+  state: string
+  role: string
+  coords: LatLng
+  elevationM: number
+  population: number
+}
+
+export const nerCities: NerCity[] = [
+  { name: "Guwahati", state: "Assam", role: "Gateway metro of the NER", coords: { lat: 26.1445, lng: 91.7362 }, elevationM: 55, population: 957352 },
+  { name: "Shillong", state: "Meghalaya", role: "State capital · hill station", coords: { lat: 25.5788, lng: 91.8933 }, elevationM: 1496, population: 354325 },
+  { name: "Dimapur", state: "Nagaland", role: "Commercial & rail hub", coords: { lat: 25.9091, lng: 93.7266 }, elevationM: 145, population: 122834 },
+  { name: "Kohima", state: "Nagaland", role: "State capital · ridge town", coords: { lat: 25.6751, lng: 94.1086 }, elevationM: 1444, population: 99039 },
+  { name: "Aizawl", state: "Mizoram", role: "State capital · hilltop city", coords: { lat: 23.7271, lng: 92.7176 }, elevationM: 1132, population: 293416 },
+  { name: "Silchar", state: "Assam", role: "Barak Valley hub", coords: { lat: 24.8333, lng: 92.7789 }, elevationM: 22, population: 172830 },
+  { name: "Imphal", state: "Manipur", role: "State capital · valley center", coords: { lat: 24.817, lng: 93.9368 }, elevationM: 786, population: 264986 },
+  { name: "Agartala", state: "Tripura", role: "State capital · border city", coords: { lat: 23.8315, lng: 91.2868 }, elevationM: 13, population: 400004 },
+  { name: "Itanagar", state: "Arunachal Pradesh", role: "State capital · foothills", coords: { lat: 27.0844, lng: 93.6053 }, elevationM: 440, population: 59490 },
+  { name: "Tawang", state: "Arunachal Pradesh", role: "High-altitude border town", coords: { lat: 27.5861, lng: 91.8594 }, elevationM: 3048, population: 11202 },
+  { name: "Gangtok", state: "Sikkim", role: "State capital · Himalayan city", coords: { lat: 27.3389, lng: 88.6065 }, elevationM: 1650, population: 100286 },
+  { name: "Dibrugarh", state: "Assam", role: "Upper Assam oil & tea hub", coords: { lat: 27.4728, lng: 94.912 }, elevationM: 108, population: 154019 },
+]
+
 export type RoutePoint = LatLng
 
 // Approximate corridor Guwahati -> Shillong (NH6)

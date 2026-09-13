@@ -1,10 +1,9 @@
 "use client"
 
-import { LogOut, User } from "lucide-react"
+import { ChevronDown, LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,11 +14,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { createClient } from "@/lib/supabase/client"
 
-export function UserMenu({ email }: { email: string | null }) {
+export function UserMenu({ email, name }: { email: string | null; name?: string | null }) {
   const router = useRouter()
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   if (!email) return null
+
+  const label = name?.trim() || email
+  const initial = label.charAt(0).toUpperCase()
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -31,13 +33,15 @@ export function UserMenu({ email }: { email: string | null }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-2 rounded-full px-2.5 text-xs">
-          <span className="flex size-5 items-center justify-center rounded-full bg-muted">
-            <User className="size-3 text-muted-foreground" />
-          </span>
-          <span className="hidden max-w-[140px] truncate sm:inline">{email}</span>
-        </Button>
+      <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-border bg-card py-1.5 pl-1.5 pr-2.5 text-sm transition-colors hover:bg-secondary/60">
+        <span className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+          {initial}
+        </span>
+        <div className="hidden text-left sm:block">
+          <p className="text-sm font-medium leading-tight text-foreground">{label}</p>
+          <p className="text-xs leading-tight text-muted-foreground">{email}</p>
+        </div>
+        <ChevronDown className="size-4 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">

@@ -115,11 +115,9 @@ export function SubmitTripDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5">
-          <Send className="size-3.5" />
-          Submit &amp; Assign Trip
-        </Button>
+      <DialogTrigger render={<Button size="sm" className="gap-1.5" />}>
+        <Send className="size-3.5" />
+        Submit &amp; Assign Trip
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

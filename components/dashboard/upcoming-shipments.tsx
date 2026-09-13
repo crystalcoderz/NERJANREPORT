@@ -20,11 +20,11 @@ export function UpcomingShipments() {
           </button>
         }
       />
-      <ul className="flex flex-col">
+      <ul className="flex flex-col divide-y divide-border">
         {shipments.map((s) => (
           <li
             key={s.id}
-            className="flex items-center justify-between border-t border-border px-4 py-3"
+            className="flex items-center justify-between px-4 py-3"
           >
             <div className="min-w-0">
               <p className="font-mono text-xs font-medium text-muted-foreground">{s.id}</p>

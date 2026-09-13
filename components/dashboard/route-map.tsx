@@ -1,12 +1,29 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import useSWR from "swr"
 import { APIProvider, Map, useMap, useMapsLibrary } from "@vis.gl/react-google-maps"
-import { MapPin, Navigation, ArrowLeftRight, KeyRound, Loader2, Waypoints, X, Sparkles } from "lucide-react"
-import { cities, type LatLng } from "@/lib/data"
+import {
+  MapPin,
+  Navigation,
+  ArrowLeftRight,
+  KeyRound,
+  Loader2,
+  Waypoints,
+  X,
+  Sparkles,
+  Droplets,
+  Thermometer,
+  Wind,
+  Cloud,
+  Zap,
+  Layers,
+} from "lucide-react"
+import { cities, nerCities, type LatLng } from "@/lib/data"
 import type { LiveIncident } from "@/app/api/incidents/route"
+import type { ClimateCell, ClimateGrid } from "@/app/api/climate-grid/route"
 import { deriveRisk, estimateRoute, formatEta, riskRank, useRoute, type RouteOption } from "./route-context"
+import { CityIntelCard } from "./city-intel-card"
 
 const incidentsFetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -14,16 +31,37 @@ const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const cityNames = Object.keys(cities)
 
 const incidentColors: Record<string, string> = {
-  info: "#2563eb",
-  moderate: "#d97706",
-  high: "#dc2626",
+  info: "#38bdf8",
+  moderate: "#fbbf24",
+  high: "#f87171",
 }
 
 const routeStrokes: Record<string, string> = {
-  low: "#16a34a",
-  moderate: "#d97706",
-  high: "#dc2626",
+  low: "#34d399",
+  moderate: "#fbbf24",
+  high: "#f87171",
 }
+
+// Console-style dark map theme so the map matches the ops dashboard chrome.
+const darkMapStyle: google.maps.MapTypeStyle[] = [
+  { elementType: "geometry", stylers: [{ color: "#1a1d23" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1d23" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8b93a3" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#3a3f4b" }] },
+  { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#8b93a3" }] },
+  { featureType: "administrative.land_parcel", stylers: [{ visibility: "off" }] },
+  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#20242c" }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2f3a" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1a1d23" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3a3f4b" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1a1d23" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#c9a95c" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#12151a" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4b5563" }] },
+]
 
 function pin(color: string, glyph: "start" | "end" | "dot") {
   if (glyph === "dot") {
@@ -45,6 +83,138 @@ function pin(color: string, glyph: "start" | "end" | "dot") {
     scaledSize: new google.maps.Size(30, 42),
     anchor: new google.maps.Point(15, 42),
   } as google.maps.Icon
+}
+
+function cityPin(active: boolean): google.maps.Icon {
+  const fill = active ? "#e0b94f" : "#c9a95c"
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+    <circle cx="11" cy="11" r="9" fill="${fill}" fill-opacity="0.18" stroke="${fill}" stroke-width="1"/>
+    <path d="M11 5l1.6 3.4 3.4.4-2.5 2.4.6 3.4L11 13.4 7.9 15l.6-3.4L6 9.2l3.4-.4z" fill="${fill}"/>
+  </svg>`
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(22, 22),
+    anchor: new google.maps.Point(11, 11),
+  } as google.maps.Icon
+}
+
+function CityLayer({ onSelect, selected }: { onSelect: (city: string) => void; selected: string | null }) {
+  const map = useMap()
+  const markerLib = useMapsLibrary("marker")
+
+  useEffect(() => {
+    if (!map || !markerLib) return
+    const markers: google.maps.Marker[] = []
+    nerCities.forEach((c) => {
+      const m = new markerLib.Marker({
+        position: c.coords,
+        map,
+        icon: cityPin(c.name === selected),
+        title: `${c.name}, ${c.state} — click for live intel`,
+        zIndex: c.name === selected ? 8 : 3,
+      })
+      m.addListener("click", () => onSelect(c.name))
+      markers.push(m)
+    })
+    return () => markers.forEach((m) => m.setMap(null))
+  }, [map, markerLib, onSelect, selected])
+
+  return null
+}
+
+export type ClimateMetric = "soil" | "soilTemp" | "wind" | "cloud" | "storm"
+
+// Map a normalized 0..1 value onto a cool→warm heat ramp for the overlay disks.
+function heatColor(t: number) {
+  const stops = [
+    { p: 0, c: [56, 189, 248] }, // info blue
+    { p: 0.5, c: [52, 211, 153] }, // low green
+    { p: 0.75, c: [251, 191, 36] }, // moderate amber
+    { p: 1, c: [248, 113, 113] }, // high red
+  ]
+  const clamped = Math.max(0, Math.min(1, t))
+  let a = stops[0]
+  let b = stops[stops.length - 1]
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (clamped >= stops[i].p && clamped <= stops[i + 1].p) {
+      a = stops[i]
+      b = stops[i + 1]
+      break
+    }
+  }
+  const span = b.p - a.p || 1
+  const f = (clamped - a.p) / span
+  const ch = (i: number) => Math.round(a.c[i] + (b.c[i] - a.c[i]) * f)
+  return `rgb(${ch(0)}, ${ch(1)}, ${ch(2)})`
+}
+
+const riskColors: Record<string, string> = { low: "#34d399", moderate: "#fbbf24", high: "#f87171" }
+
+// Resolve a cell to a color + display value for the active metric.
+function metricValue(cell: ClimateCell, metric: ClimateMetric): { color: string; label: string } {
+  switch (metric) {
+    case "soil":
+      return { color: heatColor(cell.soilMoisturePercent / 60), label: `${cell.soilMoisturePercent}% · ${cell.soilMoistureLabel}` }
+    case "soilTemp":
+      return { color: heatColor((cell.soilTemperatureC - 5) / 35), label: `${cell.soilTemperatureC}°C soil` }
+    case "wind":
+      return { color: heatColor(cell.windSpeedKph / 40), label: `${cell.windSpeedKph} km/h · gust ${cell.windGustKph}` }
+    case "cloud":
+      return { color: heatColor(cell.cloudCoverPercent / 100), label: `${cell.cloudCoverPercent}% cloud` }
+    case "storm":
+      return { color: riskColors[cell.storm.risk], label: cell.storm.label }
+  }
+}
+
+function ClimateLayer({ cells, metric }: { cells: ClimateCell[]; metric: ClimateMetric }) {
+  const map = useMap()
+  const mapsLib = useMapsLibrary("maps")
+
+  useEffect(() => {
+    if (!map || !mapsLib || cells.length === 0) return
+    const circles: google.maps.Circle[] = []
+    const info = new mapsLib.InfoWindow()
+
+    cells.forEach((cell) => {
+      const { color, label } = metricValue(cell, metric)
+      const circle = new mapsLib.Circle({
+        map,
+        center: cell.coords,
+        radius: 26000,
+        strokeColor: color,
+        strokeOpacity: 0.9,
+        strokeWeight: 1.5,
+        fillColor: color,
+        fillOpacity: 0.28,
+        clickable: true,
+        zIndex: 2,
+      })
+      circle.addListener("click", () => {
+        info.setPosition(cell.coords)
+        info.setContent(
+          `<div style="font-family:system-ui;font-size:12px;min-width:150px;color:#111">
+            <strong>${cell.name}, ${cell.state}</strong>
+            <div style="margin-top:4px;display:grid;gap:2px">
+              <span>Soil moisture: ${cell.soilMoisturePercent}% (${cell.soilMoistureLabel})</span>
+              <span>Soil temp: ${cell.soilTemperatureC}°C · Air: ${cell.airTemperatureC}°C</span>
+              <span>Cloud: ${cell.cloudCoverPercent}% · Rain: ${cell.precipProbPercent}%</span>
+              <span>Wind: ${cell.windSpeedKph} km/h (gust ${cell.windGustKph})</span>
+              <span>Storm: ${cell.storm.label}</span>
+            </div>
+          </div>`,
+        )
+        info.open(map)
+      })
+      circles.push(circle)
+    })
+
+    return () => {
+      circles.forEach((c) => c.setMap(null))
+      info.close()
+    }
+  }, [map, mapsLib, cells, metric])
+
+  return null
 }
 
 function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
@@ -159,7 +329,7 @@ function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
         path: r.path,
         map,
         geodesic: true,
-        strokeColor: isSel ? routeStrokes[r.risk] : "#94a3b8",
+        strokeColor: isSel ? routeStrokes[r.risk] : "#71717a",
         strokeOpacity: isSel ? 0.95 : 0.55,
         strokeWeight: isSel ? 5 : 4,
         zIndex: isSel ? 5 : 1,
@@ -174,7 +344,7 @@ function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
       new markerLib.Marker({
         position: sel.path[0],
         map,
-        icon: pin("#16a34a", "start"),
+        icon: pin("#34d399", "start"),
         title: `${originRef.current} (Origin)`,
         zIndex: 10,
       }),
@@ -183,7 +353,7 @@ function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
       new markerLib.Marker({
         position: sel.path[sel.path.length - 1],
         map,
-        icon: pin("#dc2626", "end"),
+        icon: pin("#f87171", "end"),
         title: `${destRef.current} (Destination)`,
         zIndex: 10,
       }),
@@ -197,7 +367,7 @@ function RouteLayer({ incidents }: { incidents: LiveIncident[] }) {
         new markerLib.Marker({
           position: pos,
           map,
-          icon: pin("#7c3aed", "dot"),
+          icon: pin("#a78bfa", "dot"),
           label: { text: String(idx + 1), color: "#ffffff", fontSize: "11px", fontWeight: "700" },
           title: `Stop ${idx + 1}: ${name}`,
           zIndex: 9,
@@ -271,7 +441,7 @@ function RouteInputs() {
       : null
 
   return (
-    <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className="pointer-events-auto flex flex-1 items-center gap-2 rounded-lg border border-border bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
           <MapPin className="size-4 shrink-0 text-risk-low" />
@@ -377,7 +547,7 @@ function RouteInputs() {
   )
 }
 
-function Legend({ source, generatedBy }: { source?: string; generatedBy?: string | null }) {
+function Legend({ source }: { source?: string }) {
   const rows = [
     { c: "bg-risk-low", t: "Low Risk" },
     { c: "bg-risk-moderate", t: "Moderate Risk" },
@@ -396,7 +566,7 @@ function Legend({ source, generatedBy }: { source?: string; generatedBy?: string
       </ul>
       {source === "ai" && (
         <p className="mt-2 flex items-center gap-1 border-t border-border pt-2 text-[10px] font-medium text-info">
-          <Sparkles className="size-3" /> Live incidents{generatedBy ? ` · ${generatedBy}` : ""}
+          <Sparkles className="size-3" /> Live incidents
         </p>
       )}
     </div>
@@ -418,8 +588,106 @@ function MissingKey() {
   )
 }
 
+const CLIMATE_METRICS: { id: ClimateMetric | "off"; label: string; icon: typeof Droplets }[] = [
+  { id: "off", label: "Off", icon: Layers },
+  { id: "soil", label: "Soil Moisture", icon: Droplets },
+  { id: "soilTemp", label: "Soil Temp", icon: Thermometer },
+  { id: "wind", label: "Wind", icon: Wind },
+  { id: "cloud", label: "Cloud", icon: Cloud },
+  { id: "storm", label: "Storm", icon: Zap },
+]
+
+function ClimateControl({
+  metric,
+  setMetric,
+  source,
+}: {
+  metric: ClimateMetric | "off"
+  setMetric: (m: ClimateMetric | "off") => void
+  source?: string
+}) {
+  return (
+    <div className="pointer-events-auto flex max-w-full flex-col gap-1.5 self-start rounded-lg border border-border bg-card/95 p-2 shadow-sm backdrop-blur sm:self-end">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Climate Layer</span>
+        {source === "open-meteo" && (
+          <span className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-risk-low">
+            <span className="size-1.5 animate-pulse rounded-full bg-risk-low" /> Live
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {CLIMATE_METRICS.map((m) => {
+          const Icon = m.icon
+          const active = metric === m.id
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setMetric(m.id)}
+              className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors ${
+                active
+                  ? "border-primary/60 bg-primary/15 text-primary"
+                  : "border-border bg-secondary/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="size-3" />
+              {m.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const SCALE_META: Record<ClimateMetric, { title: string; low: string; high: string; storm?: boolean }> = {
+  soil: { title: "Soil Moisture", low: "Dry", high: "Saturated" },
+  soilTemp: { title: "Soil Temperature", low: "Cold", high: "Hot" },
+  wind: { title: "Wind Speed", low: "Calm", high: "Strong" },
+  cloud: { title: "Cloud Cover", low: "Clear", high: "Overcast" },
+  storm: { title: "Storm Risk", low: "", high: "", storm: true },
+}
+
+function ClimateScale({ metric }: { metric: ClimateMetric }) {
+  const meta = SCALE_META[metric]
+  return (
+    <div className="absolute bottom-3 right-3 z-10 rounded-lg border border-border bg-card/95 p-2.5 shadow-sm backdrop-blur">
+      <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{meta.title}</p>
+      {meta.storm ? (
+        <ul className="flex flex-col gap-1">
+          {[
+            { c: riskColors.low, t: "Clear" },
+            { c: riskColors.moderate, t: "Storm risk" },
+            { c: riskColors.high, t: "Active / imminent" },
+          ].map((r) => (
+            <li key={r.t} className="flex items-center gap-2">
+              <span className="size-2.5 rounded-full" style={{ backgroundColor: r.c }} />
+              <span className="text-[11px] text-muted-foreground">{r.t}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">{meta.low}</span>
+          <span
+            className="h-2 w-24 rounded-full"
+            style={{
+              background: `linear-gradient(90deg, ${heatColor(0)}, ${heatColor(0.5)}, ${heatColor(0.75)}, ${heatColor(1)})`,
+            }}
+          />
+          <span className="text-[10px] text-muted-foreground">{meta.high}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function RouteMap() {
   const [mounted, setMounted] = useState(false)
+  const [selectedCity, setSelectedCity] = useState<string | null>(null)
+  const [metric, setMetric] = useState<ClimateMetric | "off">("soil")
+  const handleSelectCity = useCallback((city: string) => setSelectedCity(city), [])
   useEffect(() => setMounted(true), [])
 
   const { data: incidentsData } = useSWR<{ source: string; incidents: LiveIncident[] }>(
@@ -427,30 +695,45 @@ export function RouteMap() {
     incidentsFetcher,
     { refreshInterval: 30000 },
   )
+  const { data: climateData } = useSWR<ClimateGrid>("/api/climate-grid", incidentsFetcher, {
+    refreshInterval: 300000,
+  })
   const liveIncidents = incidentsData?.incidents ?? []
-  const generatedBy = liveIncidents.find((i) => i.model)?.model ?? null
+  const climateCells = climateData?.cells ?? []
 
   return (
-    <div className="relative min-h-[420px] w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-      <RouteInputs />
+    <div className="relative min-h-[560px] w-full overflow-hidden rounded-lg border border-border bg-card shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] lg:min-h-[640px]">
       {mounted && KEY ? (
         <APIProvider apiKey={KEY}>
           <Map
             defaultCenter={{ lat: 25.86, lng: 91.82 }}
-            defaultZoom={9}
+            defaultZoom={8}
             gestureHandling="greedy"
             disableDefaultUI
             zoomControl
-            className="h-full min-h-[420px] w-full"
+            styles={darkMapStyle}
+            className="h-full min-h-[560px] w-full lg:min-h-[640px]"
             style={{ width: "100%", height: "100%" }}
           >
             <RouteLayer incidents={liveIncidents} />
+            {metric !== "off" && <ClimateLayer cells={climateCells} metric={metric} />}
+            <CityLayer onSelect={handleSelectCity} selected={selectedCity} />
           </Map>
         </APIProvider>
       ) : (
         <MissingKey />
       )}
-      <Legend source={incidentsData?.source} generatedBy={generatedBy} />
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-col gap-2">
+        <RouteInputs />
+        {mounted && KEY && (
+          <ClimateControl metric={metric} setMetric={setMetric} source={climateData?.source} />
+        )}
+      </div>
+      {mounted && KEY && selectedCity && (
+        <CityIntelCard city={selectedCity} onClose={() => setSelectedCity(null)} />
+      )}
+      {mounted && KEY && metric !== "off" && <ClimateScale metric={metric} />}
+              <Legend source={incidentsData?.source} />
     </div>
   )
 }

@@ -1,18 +1,17 @@
 import { generateText } from "ai"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { z } from "zod"
 import { cities } from "@/lib/data"
 
 const KIMI_MODEL = "kimi-k3"
-const GEMINI_MODEL = "gemini-3.6-flash"
+// Routed through the Vercel AI Gateway (billed, no free-tier daily cap, no personal API key).
+const GEMINI_MODEL = "google/gemini-2.5-flash"
 
 const moonshot = createOpenAICompatible({
   name: "moonshot",
   apiKey: process.env.MOONSHOT_API_KEY,
   baseURL: "https://api.moonshot.ai/v1",
 })
-const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 
 const extractionSchema = z.object({
   origin: z.string().nullable(),
@@ -78,7 +77,7 @@ export async function extractTripDetails(
   }
 
   try {
-    const { text } = await generateText({ model: google(GEMINI_MODEL), prompt, temperature: 0.2 })
+    const { text } = await generateText({ model: GEMINI_MODEL, prompt, temperature: 0.2 })
     const parsed = parseJson(text)
     if (parsed) return { details: parsed, provider: "Gemini (fallback)" }
   } catch (err) {

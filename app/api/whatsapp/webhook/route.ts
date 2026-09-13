@@ -78,6 +78,8 @@ async function handleMessage(supabase: ReturnType<typeof createAdminClient>, mes
     .eq("phone_number", from)
     .maybeSingle()
 
+  console.log("[v0] WhatsApp inbound from", from, "profile linked:", Boolean(profile))
+
   if (!profile) {
     await sendWhatsAppText(
       from,
@@ -99,21 +101,24 @@ async function handleMessage(supabase: ReturnType<typeof createAdminClient>, mes
 
   const isGreeting = typeof text === "string" && GREETINGS.includes(text.trim().toLowerCase())
 
+  // Button taps must be handled before the greeting branch: that branch also matches
+  // the "idle" state the menu itself leaves behind, so checking it first would
+  // re-send the menu forever and the user could never start an assignment.
+  if (buttonId === "new_assignment") {
+    await upsertSession(supabase, from, "collecting", {})
+    await sendWhatsAppText(
+      from,
+      "Sure! Tell me the trip details — for example: \"Guwahati to Shillong by truck today 5pm\". You can send it all at once or one detail at a time.",
+    )
+    return
+  }
+
   if (isGreeting || session.state === "idle") {
     await upsertSession(supabase, from, "idle", {})
     await sendWhatsAppButtons(
       from,
       `Hi ${profile.full_name ?? "there"}! What would you like to do?`,
       [{ id: "new_assignment", title: "New Assignment" }],
-    )
-    return
-  }
-
-  if (buttonId === "new_assignment") {
-    await upsertSession(supabase, from, "collecting", {})
-    await sendWhatsAppText(
-      from,
-      "Sure! Tell me the trip details — for example: \"Guwahati to Shillong by truck today 5pm\". You can send it all at once or one detail at a time.",
     )
     return
   }

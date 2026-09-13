@@ -85,7 +85,7 @@ export function RecommendedRoute() {
         if (runId === runIdRef.current) setData(json)
       })
       .catch(() => {
-        if (runId === runIdRef.current) setData({ provider: "Offline", analysis: "Unable to reach the AI service right now." })
+        if (runId === runIdRef.current) setData({ provider: "Offline", analysis: "Unable to reach the analysis service right now." })
       })
       .finally(() => {
         if (runId === runIdRef.current) setLoading(false)
@@ -109,7 +109,7 @@ export function RecommendedRoute() {
     })
       .then((r) => r.json())
       .then((json) => runId === runIdRef.current && setData(json))
-      .catch(() => runId === runIdRef.current && setData({ provider: "Offline", analysis: "Unable to reach the AI service right now." }))
+      .catch(() => runId === runIdRef.current && setData({ provider: "Offline", analysis: "Unable to reach the analysis service right now." }))
       .finally(() => runId === runIdRef.current && setLoading(false))
   }
 
@@ -120,8 +120,8 @@ export function RecommendedRoute() {
 
   return (
     <Panel className="p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-card-foreground">Recommended Route</h3>
+      <div className="flex items-center justify-between border-b border-border pb-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recommended Route</h3>
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${ui.badge}`}>
           {ui.label}
           <ArrowRight className="size-3" />
@@ -149,13 +149,13 @@ export function RecommendedRoute() {
         {facts.map((f) => (
           <div key={f.label} className="rounded-lg border border-border bg-secondary/50 p-2.5">
             <f.icon className="size-4 text-muted-foreground" />
-            <p className="mt-1.5 text-[11px] text-muted-foreground">{f.label}</p>
-            <p className="text-sm font-semibold text-foreground">{f.value}</p>
+            <p className="mt-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">{f.label}</p>
+            <p className="font-mono text-sm font-semibold text-foreground">{f.value}</p>
           </div>
         ))}
         <div className="rounded-lg border border-border bg-secondary/50 p-2.5">
           <ui.Icon className={`size-4 ${ui.className}`} />
-          <p className="mt-1.5 text-[11px] text-muted-foreground">Risk Level</p>
+          <p className="mt-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">Risk Level</p>
           <p className={`text-sm font-semibold capitalize ${ui.className}`}>{risk}</p>
         </div>
       </div>
@@ -164,8 +164,7 @@ export function RecommendedRoute() {
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-info">
             <Sparkles className="size-3.5" />
-            AI Risk Analysis
-            {data && <span className="font-normal text-muted-foreground">· {data.provider}</span>}
+            Risk Analysis
           </span>
           <button
             type="button"
