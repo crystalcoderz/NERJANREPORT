@@ -24,7 +24,8 @@ function buildPrompt(message: string, known: Partial<TripDetails>, nowIso: strin
 
 Current date and time (ISO): ${nowIso}. Interpret all driver times in Asia/Kolkata (UTC+05:30), and include the timezone offset in the result.
 
-Known cities in the region — use these exact names when the message matches one: ${Object.keys(cities).join(", ")}
+Frequently used cities — use these exact names when the message matches one: ${Object.keys(cities).join(", ")}
+Any other Indian city (for example Jhansi, Lucknow, Nagpur, Kochi) is equally valid — never return null for a city just because it is missing from that list.
 
 Already known details for this trip (do not overwrite with null unless the user clearly corrects them):
 - origin: ${known.origin ?? "unknown"}
@@ -55,16 +56,56 @@ function parseJson(text: string): TripDetails | null {
   }
 }
 
+const PLACE_RE = /^[a-z][a-z\s.'-]{1,39}$/i
+const TIME_WORDS = /\b(today|tomorrow|tonight|morning|evening|afternoon|night|noon|am|pm|hour|hours|oclock|now|asap|later)\b/i
+const NOISE = new Set([
+  "yes", "yes please", "no", "no thanks", "ok", "okay", "hi", "hii", "hiii", "hello", "hey", "start",
+  "menu", "help", "cancel", "edit", "confirm", "new", "new assignment", "skip", "skip map", "map",
+  "send map", "send route map", "thanks", "car", "truck", "bike", "van",
+])
+
+/**
+ * Resolves a bare place reply such as "Jhansi" or "to lucknow" without calling a model.
+ * The extraction prompt is anchored on Northeast India, so cities elsewhere in the
+ * country came back null and permanently stalled the slot they were meant to fill.
+ */
+export function localSlotGuess(message: string, known: Partial<TripDetails>): TripDetails | null {
+  const raw = (message ?? "").trim().replace(/[.!,]+$/, "")
+  if (!raw || TIME_WORDS.test(raw)) return null
+
+  const toMatch = raw.match(/^(?:to|towards|going to|heading to)\s+(.+)$/i)
+  const fromMatch = raw.match(/^(?:from|starting from|start from)\s+(.+)$/i)
+  const explicit = Boolean(toMatch || fromMatch)
+
+  const value = (toMatch?.[1] ?? fromMatch?.[1] ?? raw).trim()
+  if (!PLACE_RE.test(value) || NOISE.has(value.toLowerCase())) return null
+
+  let slot: "origin" | "destination" | null = toMatch ? "destination" : fromMatch ? "origin" : null
+  // Without a preposition, the reply answers whichever slot is still open.
+  if (!slot) slot = !known.origin ? "origin" : !known.destination ? "destination" : null
+  if (!slot) return null
+  if (!explicit && (slot === "origin" ? known.origin : known.destination)) return null
+
+  const canonical = Object.keys(cities).find((c) => c.toLowerCase() === value.toLowerCase())
+  const place = canonical ?? value.replace(/\b\w/g, (m) => m.toUpperCase())
+
+  return {
+    origin: slot === "origin" ? place : null,
+    destination: slot === "destination" ? place : null,
+    mode: null,
+    departureTimeIso: null,
+  }
+}
+
 // Kimi is the primary parser per project requirements; Gemini is a silent
 // fallback so a single provider outage doesn't break the bot conversation.
 export async function extractTripDetails(
   message: string,
   known: Partial<TripDetails>,
 ): Promise<{ details: TripDetails | null; provider: string }> {
-  const city = Object.keys(cities).find((name) => name.toLowerCase() === message.trim().toLowerCase())
-  if (city && (!known.origin || !known.destination)) {
-    return { details: { origin: !known.origin ? city : null, destination: known.origin ? city : null, mode: null, departureTimeIso: null }, provider: "local" }
-  }
+  const local = localSlotGuess(message, known)
+  if (local) return { details: local, provider: "local" }
+
   const nowIso = new Date().toISOString()
   const prompt = buildPrompt(message, known, nowIso)
 

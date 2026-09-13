@@ -9,7 +9,7 @@ import {
   sendWhatsAppText,
   verifyWhatsAppSignature,
 } from "@/lib/whatsapp"
-import { extractTripDetails, type TripDetails } from "@/lib/whatsapp-ai"
+import { extractTripDetails, localSlotGuess, type TripDetails } from "@/lib/whatsapp-ai"
 import { geocodeCity } from "@/lib/geocode"
 import { computeDrivingRoute } from "@/lib/route-compute"
 import { directionsLink, sendRouteMap } from "@/lib/whatsapp-map"
@@ -70,8 +70,9 @@ export async function POST(request: NextRequest) {
         const value = change.value
         const messages = value?.messages ?? []
         for (const message of messages) {
+          if (alreadyProcessed(message?.id)) continue
           try {
-            await handleMessage(supabase, message)
+            await withPhoneLock(String(message?.from ?? ""), () => handleMessage(supabase, message))
           } catch (error) {
             console.error("WhatsApp message processing failed:", (error as Error).message)
           }
@@ -84,6 +85,36 @@ export async function POST(request: NextRequest) {
 
   // Always 200 so Meta doesn't retry-storm us on a downstream error.
   return NextResponse.json({ ok: true })
+}
+
+/**
+ * Serializes handling per phone number. Messages sent seconds apart arrive as
+ * separate webhook POSTs that each read the session before either has written,
+ * so the later write clobbered the earlier answer and the same slot question was
+ * asked twice. Queuing per sender makes each message see the previous one's state.
+ */
+const phoneQueues = new Map<string, Promise<unknown>>()
+
+function withPhoneLock<T>(phone: string, fn: () => Promise<T>): Promise<T> {
+  const previous = phoneQueues.get(phone) ?? Promise.resolve()
+  const run = previous.then(fn, fn)
+  const tail = run.catch(() => {})
+  phoneQueues.set(phone, tail)
+  // Release the entry once this run is the tail, so the map can't grow unbounded.
+  void tail.then(() => { if (phoneQueues.get(phone) === tail) phoneQueues.delete(phone) })
+  return run
+}
+
+/** Meta retries deliveries; replaying a message would re-send its reply. */
+const processedIds = new Map<string, number>()
+
+function alreadyProcessed(id: string | undefined): boolean {
+  if (!id) return false
+  const now = Date.now()
+  for (const [key, seenAt] of processedIds) if (now - seenAt > 10 * 60_000) processedIds.delete(key)
+  if (processedIds.has(id)) return true
+  processedIds.set(id, now)
+  return false
 }
 
 /**
@@ -250,16 +281,19 @@ async function continueCollecting(
     : quick.mode || quick.departureTimeIso ? { details: quick }
     : await extractTripDetails(text, known)
 
-  if (!details) {
+  // Both model providers failing must not dead-end the conversation: a bare place
+  // reply can still be resolved locally for whichever slot we are waiting on.
+  const resolved = details ?? localSlotGuess(text, known)
+  if (!resolved) {
     await sendWhatsAppText(from, "I couldn't process that right now — please try rephrasing your message.")
     return
   }
 
   const merged: Partial<TripDetails> = {
-    origin: details.origin ?? known.origin ?? null,
-    destination: details.destination ?? known.destination ?? null,
-    mode: details.mode ?? known.mode ?? null,
-    departureTimeIso: details.departureTimeIso ?? known.departureTimeIso ?? null,
+    origin: resolved.origin ?? known.origin ?? null,
+    destination: resolved.destination ?? known.destination ?? null,
+    mode: resolved.mode ?? known.mode ?? null,
+    departureTimeIso: resolved.departureTimeIso ?? known.departureTimeIso ?? null,
   }
 
 
