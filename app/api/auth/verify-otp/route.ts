@@ -45,18 +45,17 @@ export async function POST(request: Request) {
   await admin.from("otp_codes").delete().eq("email", normalizedEmail)
 
   // Ensure a user exists for this email (creates one on first sign-in).
-  const { data: existingUsers } = await admin.auth.admin.listUsers({ page: 1, perPage: 1, email: normalizedEmail } as never)
-  const existingUser = existingUsers?.users?.find((u) => u.email?.toLowerCase() === normalizedEmail)
-
-  if (!existingUser) {
-    const { error: createError } = await admin.auth.admin.createUser({
-      email: normalizedEmail,
-      email_confirm: true,
-    })
-    if (createError) {
-      console.error("[v0] Failed to create user:", createError)
-      return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 })
-    }
+  // Supabase's admin listUsers endpoint has no server-side email filter, so
+  // checking for an existing user that way is unreliable. Instead, just
+  // attempt to create the user and treat "already registered" as success —
+  // that's the expected outcome for every returning user.
+  const { error: createError } = await admin.auth.admin.createUser({
+    email: normalizedEmail,
+    email_confirm: true,
+  })
+  if (createError && createError.code !== "email_exists") {
+    console.error("[v0] Failed to create user:", createError)
+    return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 })
   }
 
   // Issue a magic-link token and immediately redeem it server-side to start a real session.
@@ -80,6 +79,15 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true })
 
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    // v0 previews render the app inside a cross-origin iframe, so the
+    // default SameSite=Lax session cookie gets dropped there (it's only
+    // sent for genuine top-level navigations, and this route sets the
+    // cookie from a fetch call, not a navigation). SameSite=None + Secure
+    // keeps it working in the preview iframe as well as normal top-level
+    // use. Without this, verify-otp appeared to succeed but the browser
+    // silently discarded the session cookie, bouncing the user straight
+    // back to the login page.
+    cookieOptions: { sameSite: "none", secure: true },
     cookies: {
       getAll() {
         return Object.entries(

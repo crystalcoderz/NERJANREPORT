@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Bell, Search, ChevronDown, Settings } from "lucide-react"
+import { Bell, Search, ChevronDown, Settings, Satellite } from "lucide-react"
 
 function getGreetingName(email: string | null | undefined) {
   if (!email) return "there"
@@ -58,6 +58,15 @@ export function TopBar({
           <Bell className="size-5" />
           <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-risk-high ring-2 ring-card" />
         </button>
+
+        <Link
+          href="/satellite"
+          aria-label="Open Satellite Command Center"
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Satellite className="size-4" />
+          <span className="hidden sm:inline">Satellite View</span>
+        </Link>
 
         <Link
           href="/settings"
