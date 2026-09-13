@@ -2,10 +2,9 @@ import { generateText } from "ai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { z } from "zod"
 import { cities } from "@/lib/data"
+import { withGemini } from "@/lib/ai-gemini"
 
 const KIMI_MODEL = "kimi-k3"
-// Routed through the Vercel AI Gateway (billed, no free-tier daily cap, no personal API key).
-const GEMINI_MODEL = "google/gemini-2.5-flash"
 
 const moonshot = createOpenAICompatible({
   name: "moonshot",
@@ -81,7 +80,9 @@ export async function extractTripDetails(
   }
 
   try {
-    const { text } = await generateText({ model: GEMINI_MODEL, prompt, temperature: 0.2, maxRetries: 0, abortSignal: AbortSignal.timeout(6000) })
+    const { text } = await withGemini((model) =>
+      generateText({ model, prompt, temperature: 0.2, maxRetries: 0, abortSignal: AbortSignal.timeout(6000) }),
+    )
     const parsed = parseJson(text)
     if (parsed) return { details: parsed, provider: "Gemini (fallback)" }
   } catch (err) {

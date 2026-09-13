@@ -2,12 +2,11 @@ import { generateText } from "ai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { NextResponse } from "next/server"
 import { nerCities } from "@/lib/data"
+import { withGemini, GEMINI_MODEL_LABEL as GEMINI_MODEL } from "@/lib/ai-gemini"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
 
-// Routed through the Vercel AI Gateway (billed, no free-tier daily cap, no personal API key).
-const GEMINI_MODEL = "google/gemini-2.5-flash"
 const KIMI_MODEL = "kimi-k3"
 
 const moonshot = createOpenAICompatible({
@@ -158,7 +157,8 @@ export async function GET(request: Request) {
 
   try {
     return await withModel(
-      async () => (await generateText({ model: GEMINI_MODEL, prompt, temperature: 0.4 })).text,
+      async () =>
+        (await withGemini((model) => generateText({ model, prompt, temperature: 0.4, maxRetries: 0 }))).text,
       "Gemini",
       GEMINI_MODEL,
     )
