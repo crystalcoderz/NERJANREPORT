@@ -8,6 +8,11 @@ import { createVertex } from "@ai-sdk/google-vertex/edge"
 //   3. the project's own Google API key (separate free-tier quota)
 // Walking them in that order means one exhausted bucket no longer forces every
 // request down to the Kimi fallback.
+// Kimi is the primary provider. Despite the "code" in its name this model writes
+// strong domain prose and clean JSON, and it answers a full route brief in ~4s —
+// kimi-k3 took 50-70s on the identical prompt for similar output length.
+export const KIMI_MODEL = "kimi-k2.7-code-highspeed"
+
 const VERTEX_MODEL = "gemini-2.5-flash"
 const GATEWAY_MODEL = "google/gemini-2.5-flash"
 const DIRECT_MODELS = ["gemini-3.5-flash", "gemini-flash-latest"]

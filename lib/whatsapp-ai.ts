@@ -2,9 +2,7 @@ import { generateText } from "ai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { z } from "zod"
 import { cities } from "@/lib/data"
-import { withGemini } from "@/lib/ai-gemini"
-
-const KIMI_MODEL = "kimi-k3"
+import { withGemini, KIMI_MODEL } from "@/lib/ai-gemini"
 
 const moonshot = createOpenAICompatible({
   name: "moonshot",

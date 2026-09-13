@@ -2,12 +2,10 @@ import { generateText } from "ai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { NextResponse } from "next/server"
 import { nerCities } from "@/lib/data"
-import { withGemini, GEMINI_MODEL_LABEL as GEMINI_MODEL } from "@/lib/ai-gemini"
+import { withGemini, KIMI_MODEL, GEMINI_MODEL_LABEL as GEMINI_MODEL } from "@/lib/ai-gemini"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
-
-const KIMI_MODEL = "kimi-k3"
 
 const moonshot = createOpenAICompatible({
   name: "moonshot",
