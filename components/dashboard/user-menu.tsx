@@ -33,20 +33,15 @@ export function UserMenu({ email, name }: { email: string | null; name?: string 
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="flex items-center gap-2 rounded-lg border border-border bg-card py-1.5 pl-1.5 pr-2.5 text-sm transition-colors hover:bg-secondary/60"
-        >
-          <span className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-            {initial}
-          </span>
-          <div className="hidden text-left sm:block">
-            <p className="text-sm font-medium leading-tight text-foreground">{label}</p>
-            <p className="text-xs leading-tight text-muted-foreground">{email}</p>
-          </div>
-          <ChevronDown className="size-4 text-muted-foreground" />
-        </button>
+      <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-border bg-card py-1.5 pl-1.5 pr-2.5 text-sm transition-colors hover:bg-secondary/60">
+        <span className="flex size-8 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+          {initial}
+        </span>
+        <div className="hidden text-left sm:block">
+          <p className="text-sm font-medium leading-tight text-foreground">{label}</p>
+          <p className="text-xs leading-tight text-muted-foreground">{email}</p>
+        </div>
+        <ChevronDown className="size-4 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">
