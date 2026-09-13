@@ -145,7 +145,7 @@ export function CityIntelCard({ city, onClose }: { city: string; onClose: () => 
       <div className="flex items-center gap-1.5 border-t border-border px-4 py-2 text-[10px] font-medium text-muted-foreground">
         <Sparkles className="size-3 text-primary" />
         {isLive ? "Live intel" : "Preparing briefing…"}
-        <span className="ml-auto">Open-Meteo · AI</span>
+        <span className="ml-auto">Open-Meteo</span>
       </div>
     </div>
   )

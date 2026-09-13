@@ -203,10 +203,10 @@ export function FieldReportsPanel() {
         <Sparkles className="size-3 shrink-0 text-primary" />
         {latestSync ? (
           <span>
-            AI monitor synced {timeAgo(latestSync.created_at)}
+            Live monitor synced {timeAgo(latestSync.created_at)}
           </span>
         ) : (
-          <span>AI monitor warming up...</span>
+          <span>Live monitor warming up...</span>
         )}
       </div>
 
