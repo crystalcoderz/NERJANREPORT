@@ -36,29 +36,57 @@ const weatherText: Record<number, string> = {
   71: "light snow",
   73: "snow",
   75: "heavy snow",
+  56: "freezing drizzle",
+  57: "dense freezing drizzle",
+  66: "freezing rain",
+  67: "heavy freezing rain",
+  77: "snow grains",
   80: "rain showers",
   81: "rain showers",
   82: "violent rain showers",
+  85: "snow showers",
+  86: "heavy snow showers",
   95: "thunderstorm",
   96: "thunderstorm with hail",
   99: "severe thunderstorm",
 }
 
+export type WeatherKind = "clear" | "cloudy" | "rain" | "storm" | "fog" | "snow"
+
+function kindFromCode(code: number | null | undefined): WeatherKind {
+  if (code == null) return "cloudy"
+  if (code <= 1) return "clear"
+  if (code <= 3) return "cloudy"
+  if (code === 45 || code === 48) return "fog"
+  if (code >= 95) return "storm"
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow"
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "rain"
+  return "cloudy"
+}
+
+async function geocodeOnce(query: string, countryCode?: string): Promise<GeoResult | null> {
+  const params = new URLSearchParams({ name: query, count: "1", language: "en", format: "json" })
+  if (countryCode) params.set("countryCode", countryCode)
+  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`, { cache: "no-store" })
+  if (!res.ok) throw new Error(`geocoding ${res.status}`)
+  const json = await res.json()
+  const first = json?.results?.[0]
+  if (!first) return null
+  return {
+    name: first.name,
+    admin1: first.admin1 || null,
+    country: first.country ?? null,
+    lat: first.latitude,
+    lng: first.longitude,
+  }
+}
+
 async function geocode(query: string): Promise<GeoResult | null> {
   try {
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`
-    const res = await fetch(url, { cache: "no-store" })
-    if (!res.ok) throw new Error(`geocoding ${res.status}`)
-    const json = await res.json()
-    const first = json?.results?.[0]
-    if (!first) return null
-    return {
-      name: first.name,
-      admin1: first.admin1 ?? null,
-      country: first.country ?? null,
-      lat: first.latitude,
-      lng: first.longitude,
-    }
+    // Resolve Indian places first: this is a Northeast India logistics platform, and a bare
+    // "Tawang" otherwise matches villages in Indonesia and the Philippines instead of Arunachal.
+    // Non-Indian queries find nothing under the IN filter and fall through to a global lookup.
+    return (await geocodeOnce(query, "IN")) ?? (await geocodeOnce(query))
   } catch (err) {
     console.log("[v0] location-brief geocode failed:", (err as Error).message)
     return null
@@ -71,25 +99,69 @@ type LiveWeather = {
   precipMm: number | null
   humidity: number | null
   condition: string
+  kind: WeatherKind
 }
 
-async function fetchWeather(lat: number, lng: number): Promise<LiveWeather> {
+type ForecastDay = {
+  date: string
+  maxC: number | null
+  minC: number | null
+  precipChance: number | null
+  windKph: number | null
+  condition: string
+  kind: WeatherKind
+}
+
+const EMPTY_WEATHER: LiveWeather = {
+  temperatureC: null,
+  windKph: null,
+  precipMm: null,
+  humidity: null,
+  condition: "unknown",
+  kind: "cloudy",
+}
+
+async function fetchWeather(lat: number, lng: number): Promise<{ weather: LiveWeather; forecast: ForecastDay[] }> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&wind_speed_unit=kmh&timezone=auto`
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max` +
+      `&forecast_days=7&wind_speed_unit=kmh&timezone=auto`
     const res = await fetch(url, { cache: "no-store" })
     if (!res.ok) throw new Error(`open-meteo ${res.status}`)
     const json = await res.json()
     const c = json.current ?? {}
+    const d = json.daily ?? {}
+    const days: string[] = Array.isArray(d.time) ? d.time : []
+
+    const forecast: ForecastDay[] = days.map((date, i) => {
+      const code = d.weather_code?.[i] ?? null
+      return {
+        date,
+        maxC: d.temperature_2m_max?.[i] ?? null,
+        minC: d.temperature_2m_min?.[i] ?? null,
+        precipChance: d.precipitation_probability_max?.[i] ?? null,
+        windKph: d.wind_speed_10m_max?.[i] ?? null,
+        condition: code != null ? weatherText[code] ?? "mixed conditions" : "unknown",
+        kind: kindFromCode(code),
+      }
+    })
+
     return {
-      temperatureC: c.temperature_2m ?? null,
-      windKph: c.wind_speed_10m ?? null,
-      precipMm: c.precipitation ?? null,
-      humidity: c.relative_humidity_2m ?? null,
-      condition: c.weather_code != null ? weatherText[c.weather_code] ?? "mixed conditions" : "unknown",
+      weather: {
+        temperatureC: c.temperature_2m ?? null,
+        windKph: c.wind_speed_10m ?? null,
+        precipMm: c.precipitation ?? null,
+        humidity: c.relative_humidity_2m ?? null,
+        condition: c.weather_code != null ? weatherText[c.weather_code] ?? "mixed conditions" : "unknown",
+        kind: kindFromCode(c.weather_code),
+      },
+      forecast,
     }
   } catch (err) {
     console.log("[v0] location-brief weather fetch failed:", (err as Error).message)
-    return { temperatureC: null, windKph: null, precipMm: null, humidity: null, condition: "unknown" }
+    return { weather: EMPTY_WEATHER, forecast: [] }
   }
 }
 
@@ -102,7 +174,17 @@ type Brief = {
 
 type Source = { title: string; url: string }
 
-function buildPrompt(place: string, weather: LiveWeather) {
+function buildPrompt(place: string, weather: LiveWeather, forecast: ForecastDay[]) {
+  const outlook = forecast.length
+    ? forecast
+        .map((d) => {
+          const lo = d.minC != null ? Math.round(d.minC) : "?"
+          const hi = d.maxC != null ? Math.round(d.maxC) : "?"
+          return `${d.date}: ${d.condition}, ${lo}-${hi}C, rain ${d.precipChance ?? 0}%`
+        })
+        .join("; ")
+    : "unavailable"
+
   return `You are a logistics, terrain and regional intelligence analyst.
 
 Draft an operational intelligence brief for: ${place}.
@@ -116,6 +198,9 @@ Live weather right now at this location:
 - Precipitation: ${weather.precipMm ?? "?"} mm
 - Humidity: ${weather.humidity ?? "?"}%
 
+7-day outlook for this location:
+${outlook}
+
 Return ONLY valid minified JSON (no markdown, no code fences) with exactly these keys:
 {
  "summary": "2-3 sentence executive summary of the location's strategic and logistics profile",
@@ -126,7 +211,7 @@ Return ONLY valid minified JSON (no markdown, no code fences) with exactly these
    {"heading": "Seasonal Hazards", "body": "2-3 sentences on weather/terrain risks across the year"}
  ],
  "highlights": ["4 to 6 short factual bullet points (single phrases): key stats, distances, corridors, risks"],
- "advisory": "1-2 sentence practical operator advisory factoring in the live weather above"
+ "advisory": "1-2 sentence practical operator advisory factoring in the live weather AND the 7-day outlook above; call out the specific upcoming day if conditions deteriorate"
 }
 Keep strings tight and factual. No preamble.`
 }
@@ -187,8 +272,8 @@ export async function GET(request: Request) {
   }
 
   const placeLabel = [geo.name, geo.admin1, geo.country].filter(Boolean).join(", ")
-  const weather = await fetchWeather(geo.lat, geo.lng)
-  const prompt = buildPrompt(placeLabel, weather)
+  const { weather, forecast } = await fetchWeather(geo.lat, geo.lng)
+  const prompt = buildPrompt(placeLabel, weather, forecast)
 
   const base = {
     place: placeLabel,
@@ -197,6 +282,7 @@ export async function GET(request: Request) {
     country: geo.country,
     coords: { lat: geo.lat, lng: geo.lng },
     weather,
+    forecast,
   }
 
   try {

@@ -13,10 +13,41 @@ import {
   ExternalLink,
   ShieldAlert,
   ArrowRight,
+  Sun,
+  Cloud,
+  CloudRain,
+  CloudFog,
+  CloudLightning,
+  CloudSnow,
 } from "lucide-react"
 import { Panel, PanelHeader } from "./panel"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+type WeatherKind = "clear" | "cloudy" | "rain" | "storm" | "fog" | "snow"
+
+const KIND_ICON: Record<WeatherKind, typeof Cloud> = {
+  clear: Sun,
+  cloudy: Cloud,
+  rain: CloudRain,
+  storm: CloudLightning,
+  fog: CloudFog,
+  snow: CloudSnow,
+}
+
+const KIND_COLOR: Record<WeatherKind, string> = {
+  clear: "text-risk-moderate",
+  cloudy: "text-muted-foreground",
+  rain: "text-info",
+  storm: "text-risk-high",
+  fog: "text-muted-foreground",
+  snow: "text-info",
+}
+
+function dayLabel(iso: string) {
+  // Parse as local midnight so the weekday doesn't shift a day in negative UTC offsets.
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { weekday: "short" })
+}
 
 type Brief = {
   summary: string
@@ -26,6 +57,16 @@ type Brief = {
 }
 
 type Source = { title: string; url: string }
+
+type ForecastDay = {
+  date: string
+  maxC: number | null
+  minC: number | null
+  precipChance: number | null
+  windKph: number | null
+  condition: string
+  kind: WeatherKind
+}
 
 type BriefResponse = {
   place: string
@@ -37,14 +78,23 @@ type BriefResponse = {
     windKph: number | null
     humidity: number | null
     condition: string
+    kind: WeatherKind
   }
+  forecast?: ForecastDay[]
   brief: Brief
   sources: Source[]
   grounded: boolean
   error?: string
 }
 
-const SUGGESTIONS = ["Guwahati", "Tawang", "Kaziranga", "Siliguri Corridor", "Imphal"]
+const SUGGESTIONS: { label: string; query: string }[] = [
+  { label: "Guwahati", query: "Guwahati" },
+  { label: "Tawang", query: "Tawang" },
+  { label: "Kaziranga", query: "Kaziranga" },
+  // The gazetteer has no feature called "Siliguri Corridor", so search the city it is named for.
+  { label: "Siliguri Corridor", query: "Siliguri" },
+  { label: "Imphal", query: "Imphal" },
+]
 
 export function LocationBriefing() {
   const [input, setInput] = useState("")
@@ -109,12 +159,12 @@ export function LocationBriefing() {
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Try</span>
           {SUGGESTIONS.map((s) => (
             <button
-              key={s}
+              key={s.label}
               type="button"
-              onClick={() => submit(s)}
+              onClick={() => submit(s.query)}
               className="rounded-full border border-border bg-secondary/40 px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
             >
-              {s}
+              {s.label}
             </button>
           ))}
         </div>
@@ -162,11 +212,61 @@ export function LocationBriefing() {
                   {data.weather.windKph != null ? `${Math.round(data.weather.windKph)}` : "—"}
                 </span>
                 <span className="flex items-center gap-1 capitalize text-muted-foreground">
-                  <Droplets className="size-3.5 text-info" />
+                  {(() => {
+                    const Icon = KIND_ICON[data.weather.kind] ?? Cloud
+                    return <Icon className={`size-3.5 ${KIND_COLOR[data.weather.kind] ?? "text-info"}`} />
+                  })()}
                   {data.weather.condition}
                 </span>
               </div>
             </div>
+
+            {data.forecast && data.forecast.length > 0 && (
+              <section aria-label="Seven day weather forecast">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    7-Day Outlook
+                  </h4>
+                  <span className="font-mono text-[10px] text-muted-foreground">high / low °C</span>
+                </div>
+                <ul className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                  {data.forecast.map((day, i) => {
+                    const Icon = KIND_ICON[day.kind] ?? Cloud
+                    const isToday = i === 0
+                    return (
+                      <li
+                        key={day.date}
+                        className={`flex flex-col items-center gap-1.5 rounded-lg border p-2 ${
+                          isToday ? "border-primary/40 bg-primary/5" : "border-border bg-secondary/30"
+                        }`}
+                      >
+                        <span
+                          className={`text-[10px] font-semibold uppercase tracking-wide ${
+                            isToday ? "text-primary" : "text-muted-foreground"
+                          }`}
+                        >
+                          {isToday ? "Today" : dayLabel(day.date)}
+                        </span>
+                        <Icon className={`size-5 ${KIND_COLOR[day.kind] ?? "text-muted-foreground"}`} />
+                        <p className="font-mono text-xs font-semibold text-foreground">
+                          {day.maxC != null ? Math.round(day.maxC) : "—"}°
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            {day.minC != null ? Math.round(day.minC) : "—"}°
+                          </span>
+                        </p>
+                        <span className="flex items-center gap-0.5 font-mono text-[10px] text-info">
+                          <Droplets className="size-2.5" />
+                          {day.precipChance ?? 0}%
+                        </span>
+                        <span className="line-clamp-2 text-center text-[9px] capitalize leading-tight text-muted-foreground">
+                          {day.condition}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            )}
 
             <p className="text-sm leading-relaxed text-foreground">{data.brief.summary}</p>
 
