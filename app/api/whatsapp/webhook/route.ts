@@ -86,6 +86,27 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
+/**
+ * Reads a tapped reply out of a webhook message. Meta uses three different shapes:
+ * interactive reply buttons, interactive list rows, and template quick-reply buttons
+ * (`message.button`), and it has been observed delivering `interactive` as a JSON string.
+ */
+function extractTap(message: any): { buttonId?: string; buttonTitle?: string } {
+  let interactive = message?.interactive
+  if (typeof interactive === "string") {
+    try { interactive = JSON.parse(interactive) } catch { interactive = undefined }
+  }
+
+  const reply = interactive?.button_reply ?? interactive?.list_reply
+  const id = reply?.id ?? message?.button?.payload
+  const title = reply?.title ?? message?.button?.text
+
+  return {
+    buttonId: typeof id === "string" && id.trim() ? id.trim().toLowerCase() : undefined,
+    buttonTitle: typeof title === "string" && title.trim() ? title : undefined,
+  }
+}
+
 async function handleMessage(supabase: ReturnType<typeof createAdminClient>, message: any) {
   const from = normalizePhoneNumber(message.from as string)
 
@@ -107,8 +128,10 @@ async function handleMessage(supabase: ReturnType<typeof createAdminClient>, mes
   }
 
   const text: string | undefined = message.text?.body
-  const buttonId: string | undefined = message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id
-  const command = (text ?? "").trim().toLowerCase()
+  const { buttonId, buttonTitle } = extractTap(message)
+  // A tap with no usable id still carries its visible title, so fall back to that:
+  // "Help" and "New Assignment" then match the same branches a typed message would.
+  const command = (text ?? buttonTitle ?? "").trim().toLowerCase().replace(/\s+/g, " ")
 
   const { data: sessionRow, error: sessionError } = await supabase
     .from("whatsapp_sessions")
@@ -174,12 +197,12 @@ async function handleMessage(supabase: ReturnType<typeof createAdminClient>, mes
       return
     }
   }
-  const isGreeting = typeof text === "string" && GREETINGS.includes(text.trim().toLowerCase())
+  const isGreeting = !buttonId && GREETINGS.includes(command)
 
   // Button taps must be handled before the greeting branch: that branch also matches
   // the "idle" state the menu itself leaves behind, so checking it first would
   // re-send the menu forever and the user could never start an assignment.
-  if (buttonId === "new_assignment" || command === "new") {
+  if (buttonId === "new_assignment" || command === "new" || command === "new assignment") {
     await upsertSession(supabase, from, "collecting", {})
     await sendWhatsAppText(
       from,
@@ -188,7 +211,9 @@ async function handleMessage(supabase: ReturnType<typeof createAdminClient>, mes
     return
   }
 
-  if (isGreeting || (session.state === "idle" && !text)) {
+  // `!buttonId` matters: without it an unrecognised tap falls in here and re-sends
+  // the very menu it came from, so the user can never leave the menu.
+  if (isGreeting || (session.state === "idle" && !text && !buttonId)) {
     await upsertSession(supabase, from, "idle", {})
     await sendWhatsAppButtons(
       from,
