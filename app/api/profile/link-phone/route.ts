@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const phoneNumber = typeof body?.phoneNumber === "string" ? normalizePhoneNumber(body.phoneNumber) : ""
   const fullName = typeof body?.fullName === "string" ? body.fullName.trim() : null
 
-  if (phoneNumber.length < 10) {
+  if (!/^[1-9]\d{9,14}$/.test(phoneNumber)) {
     return NextResponse.json({ error: "Enter a valid WhatsApp number with country code" }, { status: 400 })
   }
 
