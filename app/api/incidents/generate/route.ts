@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { generateObject, generateText } from "ai"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
@@ -9,10 +8,10 @@ import { cities } from "@/lib/data"
 export const dynamic = "force-dynamic"
 export const maxDuration = 30
 
-const GEMINI_MODEL = "gemini-flash-latest"
+// Routed through the Vercel AI Gateway (billed, no free-tier daily cap, no personal API key).
+const GEMINI_MODEL = "google/gemini-2.5-flash"
 const KIMI_MODEL = "kimi-k3"
 
-const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY })
 const moonshot = createOpenAICompatible({
   name: "moonshot",
   apiKey: process.env.MOONSHOT_API_KEY,
@@ -131,7 +130,7 @@ export async function POST() {
   let result: { object: z.infer<typeof incidentSchema> } | null = null
 
   try {
-    result = await generateObject({ model: google(GEMINI_MODEL), schema: incidentSchema, prompt, temperature: 0.3 })
+    result = await generateObject({ model: GEMINI_MODEL, schema: incidentSchema, prompt, temperature: 0.3 })
   } catch (geminiError) {
     console.log("[v0] Gemini incident generation failed, falling back to Kimi:", (geminiError as Error).message)
     try {
