@@ -120,8 +120,8 @@ export function RecommendedRoute() {
 
   return (
     <Panel className="p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-card-foreground">Recommended Route</h3>
+      <div className="flex items-center justify-between border-b border-border pb-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recommended Route</h3>
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${ui.badge}`}>
           {ui.label}
           <ArrowRight className="size-3" />
@@ -149,13 +149,13 @@ export function RecommendedRoute() {
         {facts.map((f) => (
           <div key={f.label} className="rounded-lg border border-border bg-secondary/50 p-2.5">
             <f.icon className="size-4 text-muted-foreground" />
-            <p className="mt-1.5 text-[11px] text-muted-foreground">{f.label}</p>
-            <p className="text-sm font-semibold text-foreground">{f.value}</p>
+            <p className="mt-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">{f.label}</p>
+            <p className="font-mono text-sm font-semibold text-foreground">{f.value}</p>
           </div>
         ))}
         <div className="rounded-lg border border-border bg-secondary/50 p-2.5">
           <ui.Icon className={`size-4 ${ui.className}`} />
-          <p className="mt-1.5 text-[11px] text-muted-foreground">Risk Level</p>
+          <p className="mt-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">Risk Level</p>
           <p className={`text-sm font-semibold capitalize ${ui.className}`}>{risk}</p>
         </div>
       </div>
