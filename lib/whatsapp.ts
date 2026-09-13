@@ -24,6 +24,7 @@ async function callGraph(body: Record<string, unknown>) {
   }
 
   const res = await fetch(apiUrl(`${PHONE_NUMBER_ID}/messages`), {
+    signal: AbortSignal.timeout(8000),
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -44,6 +45,31 @@ export async function sendWhatsAppText(to: string, text: string) {
   return callGraph({ to, type: "text", text: { body: text, preview_url: false } })
 }
 
+// Upload bytes rather than sharing a Google URL containing a server API key.
+export async function sendWhatsAppImage(to: string, image: Blob, caption: string): Promise<boolean> {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN
+  if (!token) return false
+  if (!["image/png", "image/jpeg"].includes(image.type) || image.size > 5 * 1024 * 1024 || image.size === 0) return false
+  try {
+    const form = new FormData()
+    form.set("messaging_product", "whatsapp")
+    form.set("type", image.type)
+    form.set("file", image, image.type === "image/png" ? "route-map.png" : "route-map.jpg")
+    const response = await fetch(apiUrl(`${PHONE_NUMBER_ID}/media`), {
+      method: "POST", headers: { Authorization: `Bearer ${token}` },
+      body: form, signal: AbortSignal.timeout(10000),
+    })
+    if (!response.ok) return false
+    const media = await response.json()
+    if (typeof media.id !== "string" || !media.id) return false
+    const sent = await callGraph({ to, type: "image", image: { id: media.id, caption: caption.slice(0, 1024) } })
+    return Boolean(sent?.messages?.[0]?.id)
+  } catch {
+    console.error("WhatsApp route image upload or send failed")
+    return false
+  }
+}
+
 export async function sendWhatsAppButtons(
   to: string,
   bodyText: string,
@@ -58,6 +84,16 @@ export async function sendWhatsAppButtons(
       action: {
         buttons: buttons.map((b) => ({ type: "reply", reply: { id: b.id, title: b.title.slice(0, 20) } })),
       },
+    },
+  })
+}
+
+export async function sendWhatsAppList(to: string, body: string, rows: { id: string; title: string }[]) {
+  return callGraph({
+    to, type: "interactive",
+    interactive: {
+      type: "list", body: { text: body },
+      action: { button: "Choose vehicle", sections: [{ title: "Vehicles", rows }] },
     },
   })
 }

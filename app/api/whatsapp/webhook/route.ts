@@ -1,26 +1,36 @@
+import { randomUUID } from "node:crypto"
 import { type NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
   WHATSAPP_VERIFY_TOKEN,
   normalizePhoneNumber,
   sendWhatsAppButtons,
+  sendWhatsAppList,
   sendWhatsAppText,
   verifyWhatsAppSignature,
 } from "@/lib/whatsapp"
 import { extractTripDetails, type TripDetails } from "@/lib/whatsapp-ai"
 import { geocodeCity } from "@/lib/geocode"
 import { computeDrivingRoute } from "@/lib/route-compute"
+import { directionsLink, sendRouteMap } from "@/lib/whatsapp-map"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 30
+export const maxDuration = 60
 
 const GREETINGS = ["hi", "hii", "hiii", "hello", "hey", "start", "menu"]
 const MODE_LABELS: Record<string, string> = { car: "Car", truck: "Truck", bike: "Bike", van: "Van" }
 
+type SessionData = Partial<TripDetails> & {
+  awaitingConfirmation?: boolean
+  tripId?: string
+  mapOfferId?: string
+  mapSent?: boolean
+}
+
 type SessionRow = {
   phone_number: string
   state: "idle" | "collecting"
-  data: Partial<TripDetails>
+  data: SessionData
   updated_at: string
 }
 
@@ -47,7 +57,10 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 })
   }
 
-  const payload = JSON.parse(rawBody || "{}")
+  let payload
+  try { payload = JSON.parse(rawBody || "{}") } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+  }
   const supabase = createAdminClient()
 
   try {
@@ -57,7 +70,11 @@ export async function POST(request: NextRequest) {
         const value = change.value
         const messages = value?.messages ?? []
         for (const message of messages) {
-          await handleMessage(supabase, message)
+          try {
+            await handleMessage(supabase, message)
+          } catch (error) {
+            console.error("WhatsApp message processing failed:", (error as Error).message)
+          }
         }
       }
     }
@@ -72,13 +89,14 @@ export async function POST(request: NextRequest) {
 async function handleMessage(supabase: ReturnType<typeof createAdminClient>, message: any) {
   const from = normalizePhoneNumber(message.from as string)
 
-  const { data: profile } = await supabase
+  if (!from) return
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("user_id, full_name, phone_number")
     .eq("phone_number", from)
     .maybeSingle()
 
-  console.log("WhatsApp inbound from", from, "profile linked:", Boolean(profile))
+  if (profileError) throw new Error("Could not load WhatsApp profile")
 
   if (!profile) {
     await sendWhatsAppText(
@@ -89,22 +107,79 @@ async function handleMessage(supabase: ReturnType<typeof createAdminClient>, mes
   }
 
   const text: string | undefined = message.text?.body
-  const buttonId: string | undefined = message.interactive?.button_reply?.id
+  const buttonId: string | undefined = message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id
+  const command = (text ?? "").trim().toLowerCase()
 
-  const { data: sessionRow } = await supabase
+  const { data: sessionRow, error: sessionError } = await supabase
     .from("whatsapp_sessions")
     .select("*")
     .eq("phone_number", from)
     .maybeSingle()
 
+  if (sessionError) throw new Error("Could not load WhatsApp session")
   const session: SessionRow = (sessionRow as SessionRow) ?? { phone_number: from, state: "idle", data: {}, updated_at: "" }
 
+  if (command === "cancel" || buttonId === "cancel") {
+    await upsertSession(supabase, from, "idle", {})
+    await sendWhatsAppButtons(from, "Draft cancelled. Ready when you are.", [{ id: "new_assignment", title: "New assignment" }])
+    return
+  }
+  if (command === "help" || buttonId === "help") {
+    await sendWhatsAppText(from, 'Send a trip such as "Guwahati to Shillong by truck tomorrow 9am", or answer one question at a time. Times are in IST. On the review, choose Send route map for an optional Google route image. Type cancel to discard a draft, or menu to start over. Review and confirm before a trip is created.')
+    return
+  }
+  const wantsMap = buttonId?.startsWith("map_") || ["map", "send map", "send route map"].includes(command)
+    || (["yes", "yes please"].includes(command) && Boolean(session.data.mapOfferId))
+  if (wantsMap) {
+    if (!session.data.awaitingConfirmation || !session.data.origin || !session.data.destination
+      || (buttonId?.startsWith("map_") && (!session.data.mapOfferId || buttonId !== `map_${session.data.mapOfferId}`))) {
+      await sendWhatsAppText(from, "That map option is no longer active. Finish reviewing your current trip, then choose Send route map.")
+      return
+    }
+    if (session.data.mapSent) {
+      await sendReviewActions(from, "Your route map is above. Ready to confirm, or would you like to edit the trip?")
+      return
+    }
+    if (!session.data.mapOfferId) {
+      session.data.mapOfferId = randomUUID()
+      await upsertSession(supabase, from, "collecting", session.data)
+    }
+    await sendWhatsAppText(from, "Preparing your Google route map...")
+    const sent = await sendRouteMap(from, session.data.origin, session.data.destination)
+    if (sent) {
+      await upsertSession(supabase, from, "collecting", { ...session.data, mapSent: true })
+      await sendReviewActions(from, "Review the map above. Your trip will only be created when you confirm.")
+    } else {
+      await sendWhatsAppButtons(from, "I couldn't send the map right now. Your draft is safe. You can retry, confirm without an image, or type edit or cancel.\n"
+        + directionsLink(session.data.origin, session.data.destination), [
+        { id: `map_${session.data.mapOfferId}`, title: "Retry route map" },
+        { id: "confirm_trip", title: "Confirm trip" }, { id: "edit_trip", title: "Edit details" },
+      ])
+    }
+    return
+  }
+  if (session.state === "collecting" && session.data.awaitingConfirmation) {
+    if (["no", "no thanks", "skip", "skip map"].includes(command)) {
+      await upsertSession(supabase, from, "collecting", { ...session.data, mapOfferId: undefined })
+      await sendReviewActions(from, "No map will be sent. Would you like to confirm this trip or edit the details?")
+      return
+    }
+    if (buttonId === "confirm_trip" || command === "confirm") {
+      await continueCollecting(supabase, from, profile, session, "", true)
+      return
+    }
+    if (buttonId === "edit_trip" || command === "edit") {
+      await upsertSession(supabase, from, "collecting", { ...session.data, mapOfferId: undefined, mapSent: false })
+      await sendWhatsAppText(from, 'Tell me what to change, for example "destination is Jorhat" or "depart tomorrow 10am". I will show an updated review.')
+      return
+    }
+  }
   const isGreeting = typeof text === "string" && GREETINGS.includes(text.trim().toLowerCase())
 
   // Button taps must be handled before the greeting branch: that branch also matches
   // the "idle" state the menu itself leaves behind, so checking it first would
   // re-send the menu forever and the user could never start an assignment.
-  if (buttonId === "new_assignment") {
+  if (buttonId === "new_assignment" || command === "new") {
     await upsertSession(supabase, from, "collecting", {})
     await sendWhatsAppText(
       from,
@@ -113,18 +188,20 @@ async function handleMessage(supabase: ReturnType<typeof createAdminClient>, mes
     return
   }
 
-  if (isGreeting || session.state === "idle") {
+  if (isGreeting || (session.state === "idle" && !text)) {
     await upsertSession(supabase, from, "idle", {})
     await sendWhatsAppButtons(
       from,
       `Hi ${profile.full_name ?? "there"}! What would you like to do?`,
-      [{ id: "new_assignment", title: "New Assignment" }],
+      [{ id: "new_assignment", title: "New Assignment" }, { id: "help", title: "Help" }],
     )
     return
   }
 
-  if (session.state === "collecting" && typeof text === "string") {
-    await continueCollecting(supabase, from, profile, session, text)
+  const selection = buttonId?.startsWith("mode_") ? buttonId.slice(5)
+    : buttonId === "depart_now" ? "now" : buttonId === "depart_hour" ? "in one hour" : undefined
+  if (typeof text === "string" || selection) {
+    await continueCollecting(supabase, from, profile, session, selection ?? text!)
     return
   }
 
@@ -137,9 +214,16 @@ async function continueCollecting(
   profile: { user_id: string; full_name: string | null },
   session: SessionRow,
   text: string,
+  confirmed = false,
 ) {
   const known = session.data ?? {}
-  const { details, provider } = await extractTripDetails(text, known)
+  const simple = text.trim().toLowerCase()
+  const quick: TripDetails = { origin: null, destination: null, mode: null, departureTimeIso: null }
+  if (["car", "truck", "bike", "van"].includes(simple)) quick.mode = simple as TripDetails["mode"]
+  if (simple === "now" || simple === "in one hour") quick.departureTimeIso = new Date(Date.now() + (simple === "now" ? 0 : 3600000)).toISOString()
+  const { details } = confirmed ? { details: known }
+    : quick.mode || quick.departureTimeIso ? { details: quick }
+    : await extractTripDetails(text, known)
 
   if (!details) {
     await sendWhatsAppText(from, "I couldn't process that right now — please try rephrasing your message.")
@@ -153,7 +237,6 @@ async function continueCollecting(
     departureTimeIso: details.departureTimeIso ?? known.departureTimeIso ?? null,
   }
 
-  console.log("WhatsApp trip extraction via", provider, merged)
 
   if (!merged.origin) {
     await upsertSession(supabase, from, "collecting", merged)
@@ -167,12 +250,36 @@ async function continueCollecting(
   }
   if (!merged.mode) {
     await upsertSession(supabase, from, "collecting", merged)
-    await sendWhatsAppText(from, "What mode of transport — car, truck, bike, or van?")
+    await sendWhatsAppList(from, "Choose your vehicle, or type car, truck, bike, or van.", Object.entries(MODE_LABELS).map(([id, title]) => ({ id: `mode_${id}`, title })))
     return
   }
   if (!merged.departureTimeIso) {
     await upsertSession(supabase, from, "collecting", merged)
-    await sendWhatsAppText(from, "When are you planning to depart? (e.g. \"today 5pm\" or \"tomorrow 9am\")")
+    await sendWhatsAppButtons(from, 'When are you departing? Choose below or type a time, e.g. "tomorrow 9am" (IST).', [{ id: "depart_now", title: "Now" }, { id: "depart_hour", title: "In one hour" }])
+    return
+  }
+
+  const departureMs = Date.parse(merged.departureTimeIso)
+  if (!Number.isFinite(departureMs) || departureMs < Date.now() - 5 * 60_000) {
+    await upsertSession(supabase, from, "collecting", { ...merged, departureTimeIso: null })
+    await sendWhatsAppText(from, "Please send a valid departure time in the future (IST).")
+    return
+  }
+  if (merged.origin.trim().toLowerCase() === merged.destination.trim().toLowerCase()) {
+    await upsertSession(supabase, from, "collecting", { ...merged, destination: null })
+    await sendWhatsAppText(from, "The destination must be different from your starting city. Where are you headed?")
+    return
+  }
+  if (!confirmed) {
+    const mapOfferId = randomUUID()
+    await upsertSession(supabase, from, "collecting", { ...merged, awaitingConfirmation: true, tripId: session.data.tripId ?? randomUUID(), mapOfferId })
+    await sendWhatsAppButtons(from, ["Review your trip", `${merged.origin} → ${merged.destination}`,
+      `Vehicle: ${MODE_LABELS[merged.mode]}`,
+      `Departure: ${new Date(departureMs).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })} IST`,
+      "Want a Google route image with both locations? Tap Send route map or reply yes. It's optional; reply no to skip.",
+      "Confirm to create, edit any detail, or type cancel."].join("\n"), [
+      { id: `map_${mapOfferId}`, title: "Send route map" }, { id: "confirm_trip", title: "Confirm trip" }, { id: "edit_trip", title: "Edit details" },
+    ])
     return
   }
 
@@ -183,7 +290,7 @@ async function continueCollecting(
   ])
 
   if (!originPlace || !destinationPlace) {
-    await upsertSession(supabase, from, "collecting", merged)
+    await upsertSession(supabase, from, "collecting", { ...merged, ...(!originPlace ? { origin: null } : { destination: null }) })
     await sendWhatsAppText(
       from,
       `I couldn't find "${!originPlace ? merged.origin : merged.destination}" on the map. Please check the spelling and send it again.`,
@@ -192,8 +299,11 @@ async function continueCollecting(
   }
 
   const route = await computeDrivingRoute(originPlace, destinationPlace)
-  const distanceKm = route?.distanceKm ?? 0
-  const durationMin = route?.durationMin ?? 0
+  if (!route) {
+    await sendWhatsAppButtons(from, "Route estimates are unavailable right now. Your draft is saved; try again shortly.", [{ id: "confirm_trip", title: "Try again" }, { id: "cancel", title: "Cancel" }])
+    return
+  }
+  const { distanceKm, durationMin } = route
 
   const departure = new Date(merged.departureTimeIso)
   const validDeparture = !Number.isNaN(departure.getTime()) ? departure : new Date()
@@ -218,6 +328,7 @@ async function continueCollecting(
   const modeLabel = MODE_LABELS[merged.mode] ?? merged.mode
 
   const { error: insertError } = await supabase.from("trips").insert({
+    ...(session.data.tripId ? { id: session.data.tripId } : {}),
     origin: originPlace.label,
     destination: destinationPlace.label,
     waypoints: [],
@@ -231,10 +342,9 @@ async function continueCollecting(
     matched_report_count: matchedReports.length,
   })
 
-  if (insertError) {
+  if (insertError && insertError.code !== "23505") {
     console.log("WhatsApp trip insert error:", insertError.message)
     await sendWhatsAppText(from, "Something went wrong creating your trip. Please try again shortly.")
-    await upsertSession(supabase, from, "idle", {})
     return
   }
 
@@ -245,8 +355,8 @@ async function continueCollecting(
       "Trip created!",
       `${originPlace.label} → ${destinationPlace.label}`,
       `Mode: ${modeLabel}`,
-      `Distance: ${distanceKm} km · Duration: ~${Math.round(durationMin / 60)}h ${durationMin % 60}m`,
-      `Departure: ${validDeparture.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`,
+      `Distance: ${distanceKm} km · Duration: ~${Math.floor(durationMin / 60)}h ${durationMin % 60}m`,
+      `Departure: ${validDeparture.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}`,
       `Risk level: ${riskLevel}`,
       matchedReports.length > 0 ? `Heads up: ${matchedReports.length} active field report(s) along this route.` : "No active field reports along this route.",
       "",
@@ -259,12 +369,19 @@ async function upsertSession(
   supabase: ReturnType<typeof createAdminClient>,
   phoneNumber: string,
   state: "idle" | "collecting",
-  data: Partial<TripDetails>,
+  data: SessionData,
 ) {
-  await supabase.from("whatsapp_sessions").upsert({
+  const { error } = await supabase.from("whatsapp_sessions").upsert({
     phone_number: phoneNumber,
     state,
     data,
     updated_at: new Date().toISOString(),
   })
+  if (error) throw new Error("Could not save WhatsApp conversation")
+}
+
+async function sendReviewActions(from: string, body: string) {
+  await sendWhatsAppButtons(from, body, [
+    { id: "confirm_trip", title: "Confirm trip" }, { id: "edit_trip", title: "Edit details" }, { id: "cancel", title: "Cancel" },
+  ])
 }
